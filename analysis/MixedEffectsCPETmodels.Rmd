@@ -1,0 +1,1742 @@
+---
+title: "MixedEffectsCPETmodels"
+author: "nickcoronato"
+date: "2021-07-16"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+
+```{r load libraries, include = FALSE}
+# Call the appropriate libraries.
+library(tidyverse)
+library(plyr)
+library(dplyr)
+library(splines)
+library(boot)
+library(broom)
+library(lme4)
+library(lmerTest)
+library(jtools)
+library(devtools)
+library(lattice)
+library(fifer)
+library(flexplot)
+library(sjPlot)
+library(officer)
+library(flextable)
+library(lsmeans)
+library(effects)
+library(ggiraph)
+library(ggiraphExtra)
+library(ggeffects)
+```
+
+# Data preparation
+
+## Read in the csv of clean data, from this project's "Data" folder.
+```{r Read in data, message = FALSE, include = FALSE}
+here::i_am("analysis/MixedEffectsCPETmodels.Rmd")
+library(here)
+
+all_GK_raw  <-  read_delim(here("data","all_data.csv"),"," ) #This is the raw data set
+
+# This next step divides the full time series for each subject into their 5-10 Exercise and Recovery bouts. Bouts labelled with a ".5" suffix are the recovery (off-transient) bouts.
+
+all_GK_bybout <- mutate(all_GK_raw, 
+                        bout =case_when(
+  (Time_Sec<120 & Work < 10)~"0",
+  (Time_Sec >= 2 & Time_Sec < 175 & Work >=10)~"1",
+  (Time_Sec<185 & Work < 10)~"1.5",
+  (Time_Sec >= 175 & Time_Sec<300 & Work >=10)~"2",
+  (Time_Sec<365 & Work < 10)~"2.5",
+  (Time_Sec >= 300 & Time_Sec < 495 & Work >=10)~"3",
+  (Time_Sec<545 & Work < 10)~"3.5",
+  (Time_Sec >= 495 & Time_Sec <675 & Work >=10)~"4",
+  (Time_Sec<725 & Work < 10)~"4.5",
+  (Time_Sec >= 675 & Time_Sec <855 & Work >=10)~"5",
+  (Time_Sec<905 & Work < 10)~"5.5", 
+  (Time_Sec >= 855 & Time_Sec <1035 & Work >= 10)~"6", 
+  (Time_Sec<1085 & Work < 10)~"6.5", 
+  (Time_Sec >= 1035 & Time_Sec <1215 & Work >= 10)~"7", 
+  (Time_Sec<1265 & Work < 10)~"7.5",
+  (Time_Sec >= 1215 & Time_Sec <1400 & Work >= 10)~"8", 
+  (Time_Sec <1445 & Work < 10)~"8.5",
+  (
+    # Time_Sec >= 1400 & 
+      Time_Sec <1575 & Work >= 10)~"9",
+  (
+    # Time_Sec >= 1540 & 
+     Time_Sec<1625 & Work < 10)~"9.5",
+  (Time_Sec >= 1575 & Work >= 10)~"10", 
+  (Time_Sec >= 1625 & Work < 10)~"10.5"))
+
+names(all_GK_bybout)[13] <- "Tanner"
+# 'Tanner' column is the descriptor for the puberty variable. Early pubertal subjects score 1-2 on the Tanner scale, and late pubertal subjects score 4-5.
+
+# The next step ensures that we have all variables of interest. Note that some are normalized by bodymass (kg) and lean body mass (kg), which are slightly different measurements.
+all_GK_bybout <- mutate(all_GK_bybout, "VO2/kglbm"=VO2 / lbm,"VE/VCO2" = (VE / VCO2),"VCO2/kg" =  VCO2/bodymass,"VE/kg" = VE/bodymass, "VCO2/kglbm" =  VCO2/lbm,"VE/kglbm" = VE/lbm)
+
+
+# All variables should be coded as Factors, with the exception of bout, which is our discrete repeated measure.
+all_GK_bybout$Tanner <- as.factor(all_GK_bybout$Tanner)
+all_GK_bybout$Gender <- as.factor(all_GK_bybout$Gender)
+all_GK_bybout$intensity <- as.factor(all_GK_bybout$intensity)
+# all_GK_bybout$bout <- as.factor(all_GK_bybout$bout)
+all_GK_bybout$ID <- as.factor(all_GK_bybout$ID)
+
+
+all_GK_bybout <- all_GK_bybout %>% dplyr::select(ID, bodymass, lbm, intensity, Tanner, Gender, bout, Time_Sec, Work, HR, VO2, 'VO2/kg', 'VO2/kglbm', VCO2, 'VCO2/kg', 'VCO2/kglbm', RQ, VE, 'VE/kg','VE/kglbm', RR, `VE/VCO2`)
+all_GK_bybout <- as_tibble(all_GK_bybout)
+
+head(all_GK_bybout,6)
+
+# Check for any NA values in bout column.
+(extra_NA <- all_GK_bybout[is.na(all_GK_bybout$bout),])
+
+(summary(all_GK_bybout)) 
+```
+
+## Convert the 'bout' variable to discrete numeric values. For the off-transient bouts (recovery periods), subtract 1.5 in order to center the variable at 0 for further analysis.
+```{r, message = FALSE, warning = FALSE}
+ontransbouts <- filter(all_GK_bybout,bout%in%c(0,1,2,3,4,5))
+ontransbouts$bout <- as.numeric(ontransbouts$bout)
+
+offtransbouts <- filter(all_GK_bybout,bout%in%c(1.5,2.5,3.5,4.5,5.5,6.5))
+offtransbouts$bout <- as.numeric(offtransbouts$bout)
+offtransbouts <- mutate(offtransbouts, bout = bout-1.5)
+```
+
+
+## Compute the averages. Pull out the 'avgHR' at each "on-transient" and "off-transient" bout (1-5).
+```{r}
+avgHRon <- aggregate(ontransbouts$HR, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgHRon)[6] <- "avgHR"
+
+avgHRoff <- aggregate(offtransbouts$HR, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgHRoff)[6] <- "avgHR"
+```
+
+## Data visualization. Plot the average HR data distributions.
+```{r}
+# plot the avg ON-transient HR
+ggplot(data=avgHRon, aes(bout, avgHR, color = intensity)) + geom_point() + ggtitle("On-Transient average heart rates")
+
+# plot the avg off-transient HR
+ggplot(data=avgHRoff, aes(bout, avgHR, color = intensity)) + geom_point()+ ggtitle("Off-Transient average heart rates")
+
+ggplot(data=filter(avgHRon, intensity == "low"), aes(x = bout,y= avgHR, group = ID)) + geom_line() + ggtitle("Low intensity, Avg HR for on-transient periods")+ ylim(80,210) 
+
+ggplot(data=filter(avgHRoff, intensity == "low"), aes(x = bout,y= avgHR, group = ID)) + geom_line() + ggtitle("Low intensity, Avg HR for off-transient periods")+ ylim(80,210)
+
+ggplot(data=filter(avgHRon, intensity == "high"), aes(x = bout,y= avgHR, group = ID)) + geom_line() + ggtitle("High intensity, Avg HR for on-transient periods") + ylim(80,210) 
+
+ggplot(data=filter(avgHRoff, intensity == "high"), aes(x = bout,y= avgHR, group = ID)) + geom_line() + ggtitle("High intensity, Avg HR for off-transient periods") + ylim(80,210)
+```
+
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgHR ~ bout | Gender*Tanner, data = avgHRon, groups = intensity, 
+       type = c("p","r"), 
+       auto.key = TRUE)
+
+xyplot(avgHR ~ bout | ID, data = avgHRon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgHR ~ bout | ID, data = avgHRon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+### More visualizations
+```{r}
+boxplot(avgHR~Gender*Tanner*bout*intensity, data = avgHRon)
+```
+
+```{r}
+### Viewing the categorical variables of interest
+
+# Flexplot of Gender distribution
+flexplot(avgHR~Gender, data=avgHRon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgHR~Gender, data=avgHRoff, spread="quartiles", jitter=c(.1, 0))
+
+# Flexplot of Puberty distribution
+flexplot(avgHR~Tanner, data=avgHRon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgHR~Tanner, data=avgHRoff, spread="quartiles", jitter=c(.1, 0))
+
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgHR~bout + intensity | Gender + Tanner, data=avgHRon, method="lm", se=F, bins=2)
+
+### multivariate relationship (this is more data exploration, prior to the real modeling.)
+flexplot(avgHR~bout + intensity | Gender + Tanner, data=avgHRon)
+flexplot(avgHR~bout + Gender | intensity + Tanner, data=avgHRon)
+flexplot(avgHR~bout + Tanner | intensity + Gender, data=avgHRon)
+```
+
+
+#################################################
+
+# LINEAR MIXED EFFECTS MODELING with the lme4 package
+This next section is the full procedure for step-wise variable selection to identify the appropriate mixed-effects model.
+
+In total, there are 14 selected models. Each physiological signal (x7) has two associated models: one linear model is fit to the On-Transient average responses, and a second model is fit to the Off-Transient averages. 
+
+The final multi-level models (MLMs) were chosen through a stepwise variable selection approach that began with the most complex model. Fixed effects considered in the full model were: 
+Gender, a factor with two levels (Male, Female); 
+Maturational status, a factor with two levels (Early, Late); 
+work intensity, a factor with two levels (Low, High); 
+and Bout, a continuous predictor in the range of 0 to 5. 
+
+Random slope and intercept were allowed in the bout term for each participant ID in order to account for individual variation between subjects. This controlled for innate differences between subjects’ physical fitness levels, psychological motivation, and other non-measured variables. If the full model showed insignificance (p-value > 0.05) in the four-way interaction (Gender* Puberty * Intensity * Bout), the model was re-fit with only three-way interactions. 
+
+This stepwise process was repeated, removing higher-level interactions until all fixed effects were statistically significant or no more interactions existed. In order to determine that a simpler model provided better fit than the previous (more complex) model, a standard ANOVA process and Chi-squared comparison was used, as well as a check for reduction in BIC and a Bayes Factor analysis. The simplest possible models used only fixed effects for Gender, Puberty, Intensity, and Bout. However, each of the final 14 models included a unique combination of fixed effects and cross-level interactions that required careful interpretation. Residual plots were analyzed for each final model to confirm an appropriate fit.
+
+The first physiological signal for analysis is Heart Rate (HR).
+
+## HR ON Transient
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgHR~Gender*Tanner*intensity*bout +(bout|ID), data = avgHRon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgHR~Gender+Tanner*bout * intensity + (bout|ID)  , data = avgHRon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+HRon <- m1B
+```
+
+
+### Comparing On transient models
+```{r}
+improve.fit(m1B,m1)
+
+anova(m1, m1B)
+```
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgHR~Gender*Tanner*bout*intensity + (bout|ID)  , data = avgHRoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgHR~Gender*Tanner*bout + intensity + (bout|ID)  , data = avgHRoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgHR~ bout * intensity + Tanner*intensity + Gender*intensity + (bout|ID)  ,  data = avgHRoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# fixef(m2C)
+# ranef(m2C)
+HRoff <- m2C
+```
+
+### Comparing Off transient models
+```{r}
+improve.fit(m2B,m2)
+improve.fit(m2C,m2B)
+
+anova(m2C, m2B)
+```
+
+
+```{r}
+# Bayes factor = probability of full model / probability of reduced model - it's an odds. We can approximate BF using BIC:
+# in general, BF >10 = strong evidence in favor of the model in the numerator
+bf.bic(m2C,m2)
+bf.bic(m1B,m1)
+```
+
+
+## VO2/kg On Transient
+
+First, pull out the average on and off transient VO2kg values for each bout.
+```{r}
+avgVO2kgon <- aggregate(ontransbouts$'VO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVO2kgon)[6] <- "avgVO2kg"
+
+avgVO2kgoff <- aggregate(offtransbouts$'VO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVO2kgoff)[6] <- "avgVO2kg"
+```
+
+
+## Plot the average VO2kg data distributions.
+```{r}
+#plot the avg ON-transient VO2kg
+ggplot(data=avgVO2kgon, aes(bout, avgVO2kg, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
+
+#plot the avg off-transient VO2kg
+ggplot(data=avgVO2kgoff, aes(bout, avgVO2kg, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VO2/kg rates")
+
+ggplot(data=filter(avgVO2kgon, intensity == "low"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kg for on-transient periods") + ylim(0,75) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVO2kgoff, intensity == "low"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kg for off-transient periods")+  ylim(0,75) 
+
+ggplot(data=filter(avgVO2kgon, intensity == "high"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kg for on-transient periods")  + ylim(0,75) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVO2kgoff, intensity == "high"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kg for off-transient periods") + ylim(0,75)  
+```
+
+## Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+## More visualizations
+```{r}
+### categorical variable
+flexplot(avgVO2kg~Gender, data=avgVO2kgon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVO2kg~Gender, data=avgVO2kgoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVO2kg~Tanner, data=avgVO2kgon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVO2kg~Tanner, data=avgVO2kgoff, spread="quartiles", jitter=c(.1, 0))
+
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVO2kg~bout + intensity | Gender + Tanner, data=avgVO2kgon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVO2kg~bout + intensity | Gender + Tanner, data=avgVO2kgon)
+flexplot(avgVO2kg~bout + Gender | intensity + Tanner, data=avgVO2kgon)
+flexplot(avgVO2kg~bout + Tanner | intensity + Gender, data=avgVO2kgon)
+```
+
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVO2kg~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVO2kgon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVO2kg~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kgon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+```
+
+### Model 1C: No interactions
+
+```{r}
+m1C <- lmer(avgVO2kg~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kgon, REML=FALSE)
+# summary(m1C)
+summ(m1C)
+# coef(m1C)
+# fixef(m1C)
+# ranef(m1C)
+VO2KGon <- m1C
+```
+
+## VO2kg OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVO2kg~Gender*Tanner*bout*intensity +(bout|ID) ,data = avgVO2kgoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVO2kg~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kgoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgVO2kg~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kgoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# # fixef(m2C)
+# ranef(m2C)
+VO2KGoff <- m2C
+```
+
+
+## VO2/kg LEAN BODY MASS On Transient
+
+
+First, pull out the average on and off transient VO2kg values for each bout.
+```{r}
+avgVO2kglbmon <- aggregate(ontransbouts$'VO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVO2kglbmon)[6] <- "avgVO2kglbm"
+
+avgVO2kglbmoff <- aggregate(offtransbouts$'VO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVO2kglbmoff)[6] <- "avgVO2kglbm"
+```
+
+
+## Plot the average VO2kglbm data distributions.
+```{r}
+#plot the avg ON-transient VO2kglbm
+ggplot(data=avgVO2kglbmon, aes(bout, avgVO2kglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
+
+#plot the avg off-transient VO2kglbm
+ggplot(data=avgVO2kglbmoff, aes(bout, avgVO2kglbm, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VO2/kg rates")
+
+ggplot(data=filter(avgVO2kglbmon, intensity == "low"), aes(x = bout,y= avgVO2kglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kglbm for on-transient periods") + ylim(0,75) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVO2kglbmoff, intensity == "low"), aes(x = bout,y= avgVO2kglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kglbm for off-transient periods")+  ylim(0,75) 
+
+ggplot(data=filter(avgVO2kglbmon, intensity == "high"), aes(x = bout,y= avgVO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kglbm for on-transient periods")  + ylim(0,75) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVO2kglbmoff, intensity == "high"), aes(x = bout,y= avgVO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kglbm for off-transient periods") + ylim(0,75)  
+```
+
+## Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+## More visualizations
+```{r}
+### categorical variable
+flexplot(avgVO2kglbm~Gender, data=avgVO2kglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVO2kglbm~Gender, data=avgVO2kglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVO2kglbm~Tanner, data=avgVO2kglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVO2kglbm~Tanner, data=avgVO2kglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVO2kglbm~bout + intensity | Gender + Tanner, data=avgVO2kglbmon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVO2kglbm~bout + intensity | Gender + Tanner, data=avgVO2kglbmon)
+flexplot(avgVO2kglbm~bout + Gender | intensity + Tanner, data=avgVO2kglbmon)
+flexplot(avgVO2kglbm~bout + Tanner | intensity + Gender, data=avgVO2kglbmon)
+```
+
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVO2kglbm~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+```
+
+### Model 1C: Some interactions
+
+```{r}
+m1C <- lmer(avgVO2kglbm~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+# summary(m1C)
+summ(m1C)
+# coef(m1C)
+# fixef(m1C)
+# ranef(m1C)
+VO2KGLBMon <- m1C
+```
+
+## VO2kglbm OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) ,data = avgVO2kglbmoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVO2kglbm~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgVO2kglbm~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# # fixef(m2C)
+# ranef(m2C)
+VO2KGLBMoff <- m2C
+```
+
+
+
+
+# VCO2/kg On Transient
+
+First, pull out the average on and off transient VCO2 values for each bout.
+```{r}
+avgVCO2on <- aggregate(ontransbouts$'VCO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVCO2on)[6] <- "avgVCO2"
+
+avgVCO2off <- aggregate(offtransbouts$'VCO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVCO2off)[6] <- "avgVCO2"
+```
+
+##Plot the average VCO2 data distributions.
+```{r}
+#plot the avg ON-transient VCO2
+ggplot(data=avgVCO2on, aes(bout, avgVCO2, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
+
+#plot the avg off-transient VCO2
+ggplot(data=avgVCO2off, aes(bout, avgVCO2, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VCO2 rates")
+
+ggplot(data=filter(avgVCO2on, intensity == "low"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2 for on-transient periods") + ylim(0,0.2) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVCO2off, intensity == "low"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2 for off-transient periods")+ ylim(0,0.2)
+
+ggplot(data=filter(avgVCO2on, intensity == "high"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2 for on-transient periods")  + ylim(0,0.2) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVCO2off, intensity == "high"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2 for off-transient periods") + ylim(0,0.2)  
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+### More visualizations
+```{r}
+### categorical variable
+flexplot(avgVCO2~Gender, data=avgVCO2on, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVCO2~Gender, data=avgVCO2off, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVCO2~Tanner, data=avgVCO2on, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVCO2~Tanner, data=avgVCO2off, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVCO2~bout + intensity | Gender + Tanner, data=avgVCO2on, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVCO2~bout + intensity | Gender + Tanner, data=avgVCO2on)
+flexplot(avgVCO2~bout + Gender | intensity + Tanner, data=avgVCO2on)
+flexplot(avgVCO2~bout + Tanner | intensity + Gender, data=avgVCO2on)
+```
+
+
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVCO2~bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVCO2on, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVCO2~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2on, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+VCO2on <- m1B
+```
+
+
+# VCO2/kg OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVCO2~Gender*Tanner*bout*intensity + (bout|ID) , data = avgVCO2off, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVCO2~Gender * intensity * Tanner + bout +(bout|ID) ,  data = avgVCO2off, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# fixef(m2B)
+# ranef(m2B)
+VCO2off <- m2B
+```
+
+
+# VCO2/kg lean body mass On Transient
+
+First, pull out the average on and off transient VCO2kglbm values for each bout.
+```{r}
+avgVCO2kglbmon <- aggregate(ontransbouts$'VCO2/kglbm', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVCO2kglbmon)[6] <- "avgVCO2kglbm"
+
+avgVCO2kglbmoff <- aggregate(offtransbouts$'VCO2/kglbm', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVCO2kglbmoff)[6] <- "avgVCO2kglbm"
+```
+
+##Plot the average VCO2kglbm data distributions.
+```{r}
+#plot the avg ON-transient VCO2kglbm
+ggplot(data=avgVCO2kglbmon, aes(bout, avgVCO2kglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
+
+#plot the avg off-transient VCO2kglbm
+ggplot(data=avgVCO2kglbmoff, aes(bout, avgVCO2kglbm, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VCO2kglbm rates")
+
+ggplot(data=filter(avgVCO2kglbmon, intensity == "low"), aes(x = bout,y= avgVCO2kglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2kglbm for on-transient periods") + ylim(0,0.2) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVCO2kglbmoff, intensity == "low"), aes(x = bout,y= avgVCO2kglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2kglbm for off-transient periods")+  ylim(0,0.2)
+
+ggplot(data=filter(avgVCO2kglbmon, intensity == "high"), aes(x = bout,y= avgVCO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2kglbm for on-transient periods")  + ylim(0,0.2)
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVCO2kglbmoff, intensity == "high"), aes(x = bout,y= avgVCO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2kglbm for off-transient periods") + ylim(0,0.2)
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVCO2kglbm ~ bout | ID, data = avgVCO2kglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVCO2kglbm ~ bout | ID, data = avgVCO2kglbmon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVCO2kglbm ~ bout | ID, data = avgVCO2kglbmon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+### More visualizations
+```{r}
+### categorical variable
+flexplot(avgVCO2kglbm~Gender, data=avgVCO2kglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVCO2kglbm~Gender, data=avgVCO2kglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVCO2kglbm~Tanner, data=avgVCO2kglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVCO2kglbm~Tanner, data=avgVCO2kglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVCO2kglbm~bout + intensity | Gender + Tanner, data=avgVCO2kglbmon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVCO2kglbm~bout + intensity | Gender + Tanner, data=avgVCO2kglbmon)
+flexplot(avgVCO2kglbm~bout + Gender | intensity + Tanner, data=avgVCO2kglbmon)
+flexplot(avgVCO2kglbm~bout + Tanner | intensity + Gender, data=avgVCO2kglbmon)
+```
+
+
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVCO2kglbm~bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVCO2kglbmon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVCO2kglbm~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2kglbmon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+VCO2kglbmon <- m1B
+```
+
+
+# VCO2kglbm OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVCO2kglbm~Gender*Tanner*bout*intensity + (bout|ID) , data = avgVCO2kglbmoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVCO2kglbm~Gender * intensity * Tanner + bout +(bout|ID) ,  data = avgVCO2kglbmoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgVCO2kglbm ~ bout + Gender*intensity +Tanner*intensity + (bout|ID),  data = avgVCO2kglbmoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# fixef(m2C)
+# ranef(m2C)
+VCO2kglbmoff <- m2C
+```
+
+# RQ On Transient
+
+First, pull out the average on and off transient RQ values for each bout.
+```{r}
+avgRQon <- aggregate(ontransbouts$RQ, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgRQon)[6] <- "avgRQ"
+
+avgRQoff <- aggregate(offtransbouts$RQ, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgRQoff)[6] <- "avgRQ"
+```
+
+##Plot the average RQ data distributions.
+```{r}
+#plot the avg ON-transient RQ
+ggplot(data=avgRQon, aes(bout, avgRQ, color = intensity)) + geom_point() + ggtitle("On-Transient average RQ rates")
+
+#plot the avg off-transient RQ
+ggplot(data=avgRQoff, aes(bout, avgRQ, color = intensity)) + geom_point()+ ggtitle("Off-Transient average RQ rates")
+
+ggplot(data=filter(avgRQon, intensity == "low"), aes(x = bout,y= avgRQ, group = ID)) + geom_line() + ggtitle("Low intensity, Avg RQ for on-transient periods") + ylim(0,2) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgRQoff, intensity == "low"), aes(x = bout,y= avgRQ, group = ID)) + geom_line() + ggtitle("Low intensity, Avg RQ for off-transient periods")+  ylim(0,2) 
+
+ggplot(data=filter(avgRQon, intensity == "high"), aes(x = bout,y= avgRQ, group = ID)) + geom_line() + ggtitle("High intensity, Avg RQ for on-transient periods")  + ylim(0,2) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgRQoff, intensity == "high"), aes(x = bout,y= avgRQ, group = ID)) + geom_line() + ggtitle("High intensity, Avg RQ for off-transient periods") + ylim(0,2)  
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+# More visualizations
+```{r}
+### categorical variable
+flexplot(avgRQ~Gender, data=avgRQon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgRQ~Gender, data=avgRQoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgRQ~Tanner, data=avgRQon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgRQ~Tanner, data=avgRQoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgRQ~bout + intensity | Gender + Tanner, data=avgRQon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgRQ~bout + intensity | Gender + Tanner, data=avgRQon)
+flexplot(avgRQ~bout + Gender | intensity + Tanner, data=avgRQon)
+flexplot(avgRQ~bout + Tanner | intensity + Gender, data=avgRQon)
+```
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgRQ~ bout*Gender*Tanner*intensity + (bout|ID)  , data = avgRQon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# # fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgRQ~ Gender*Tanner*bout + intensity +(bout|ID)  , data = avgRQon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+```
+
+### Model 1B2: Some interactions
+
+```{r}
+m1C <- lmer(avgRQ~ Tanner*intensity + Gender + bout +(bout|ID)  , data = avgRQon, REML=FALSE)
+# summary(m1C)
+summ(m1C)
+# coef(m1C)
+# ranef(m1C)
+RQon <- m1C
+```
+
+
+## RQ OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgRQ~ bout*Gender*Tanner*intensity +(bout|ID)  , data = avgRQoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgRQ~Gender*Tanner*bout + intensity +(bout|ID)  ,  data = avgRQoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# # fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: No interactions
+```{r}
+m2C <- lmer(avgRQ~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID)  ,  data = avgRQoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# # fixef(m2C)
+# ranef(m2C)
+RQoff <- m2C
+```
+
+# VE/kg On Transient
+
+First, pull out the average on and off transient VE values for each bout.
+```{r}
+avgVEon <- aggregate(ontransbouts$'VE/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVEon)[6] <- "avgVE"
+
+avgVEoff <- aggregate(offtransbouts$'VE/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVEoff)[6] <- "avgVE"
+```
+
+##Plot the average VE data distributions.
+```{r}
+#plot the avg ON-transient VE
+ggplot(data=avgVEon, aes(bout, avgVE, color = intensity)) + geom_point() + ggtitle("On-Transient average VE rates")
+
+#plot the avg off-transient VE
+ggplot(data=avgVEoff, aes(bout, avgVE, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VE rates")
+
+ggplot(data=filter(avgVEon, intensity == "low"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE for on-transient periods") + ylim(0,4) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVEoff, intensity == "low"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE for off-transient periods")+  ylim(0,4) 
+
+ggplot(data=filter(avgVEon, intensity == "high"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE for on-transient periods")  + ylim(0,4) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVEoff, intensity == "high"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE for off-transient periods") + ylim(0,4)  
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVE ~ bout | ID, data = avgVEon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVE ~ bout | ID, data = avgVEon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVE ~ bout | ID, data = avgVEon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+# More visualizations
+```{r}
+### categorical variable
+flexplot(avgVE~Gender, data=avgVEon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVE~Gender, data=avgVEoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVE~Tanner, data=avgVEon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVE~Tanner, data=avgVEoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVE~bout + intensity | Gender + Tanner, data=avgVEon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVE~bout + intensity | Gender + Tanner, data=avgVEon)
+flexplot(avgVE~bout + Gender | intensity + Tanner, data=avgVEon)
+flexplot(avgVE~bout + Tanner | intensity + Gender, data=avgVEon)
+```
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVE~  bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVEon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# # fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVE~bout + Gender*intensity + Tanner*intensity +(bout|ID)  , data = avgVEon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+VEon <- m1B
+```
+
+## VE OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVE~ bout*intensity*Gender*Tanner +(bout|ID) , data = avgVEoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+VEoff <- m2
+```
+
+# VE/kglbm On Transient
+
+First, pull out the average on and off transient VEkglbm values for each bout.
+```{r}
+avgVEkglbmon <- aggregate(ontransbouts$'VE/kglbm', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVEkglbmon)[6] <- "avgVEkglbm"
+
+avgVEkglbmoff <- aggregate(offtransbouts$'VE/kglbm', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVEkglbmoff)[6] <- "avgVEkglbm"
+```
+
+##Plot the average VEkglbm data distributions.
+```{r}
+#plot the avg ON-transient VEkglbm
+ggplot(data=avgVEkglbmon, aes(bout, avgVEkglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VEkglbm rates")
+
+#plot the avg off-transient VEkglbm
+ggplot(data=avgVEkglbmoff, aes(bout, avgVEkglbm, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VEkglbm rates")
+
+ggplot(data=filter(avgVEkglbmon, intensity == "low"), aes(x = bout,y= avgVEkglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VEkglbm for on-transient periods") + ylim(0,5) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVEkglbmoff, intensity == "low"), aes(x = bout,y= avgVEkglbm, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VEkglbm for off-transient periods")+  ylim(0,5)  
+
+ggplot(data=filter(avgVEkglbmon, intensity == "high"), aes(x = bout,y= avgVEkglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VEkglbm for on-transient periods")  + ylim(0,5)  
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVEkglbmoff, intensity == "high"), aes(x = bout,y= avgVEkglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VEkglbm for off-transient periods") + ylim(0,5) 
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+# More visualizations
+```{r}
+### categorical variable
+flexplot(avgVEkglbm~Gender, data=avgVEkglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVEkglbm~Gender, data=avgVEkglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVEkglbm~Tanner, data=avgVEkglbmon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVEkglbm~Tanner, data=avgVEkglbmoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVEkglbm~bout + intensity | Gender + Tanner, data=avgVEkglbmon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVEkglbm~bout + intensity | Gender + Tanner, data=avgVEkglbmon)
+flexplot(avgVEkglbm~bout + Gender | intensity + Tanner, data=avgVEkglbmon)
+flexplot(avgVEkglbm~bout + Tanner | intensity + Gender, data=avgVEkglbmon)
+```
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVEkglbm~  bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVEkglbmon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# # fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVEkglbm~bout*intensity + Gender*intensity + Tanner*intensity +(bout|ID)  , data = avgVEkglbmon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+VEkglbmon <- m1B
+```
+
+
+## VEkglbm OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVEkglbm~ bout*intensity*Gender*Tanner +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVEkglbm~Gender*Tanner*bout+intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# # fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgVEkglbm~Gender*intensity + bout*intensity + Tanner*intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# # fixef(m2C)
+# ranef(m2C)
+VEkglbmoff <- m2C
+```
+
+
+#  RR On Transient
+
+First, pull out the average on and off transient RR values for each bout.
+```{r}
+avgRRon <- aggregate(ontransbouts$RR, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgRRon)[6] <- "avgRR"
+
+avgRRoff <- aggregate(offtransbouts$RR, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgRRoff)[6] <- "avgRR"
+```
+
+##Plot the average RR data distributions.
+```{r}
+#plot the avg ON-transient RR
+ggplot(data=avgRRon, aes(bout, avgRR, color = intensity)) + geom_point() + ggtitle("On-Transient average RR rates")
+
+#plot the avg off-transient RR
+ggplot(data=avgRRoff, aes(bout, avgRR, color = intensity)) + geom_point()+ ggtitle("Off-Transient average RR rates")
+
+ggplot(data=filter(avgRRon, intensity == "low"), aes(x = bout,y= avgRR, group = ID)) + geom_line() + ggtitle("Low intensity, Avg RR for on-transient periods") + ylim(0,80) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgRRoff, intensity == "low"), aes(x = bout,y= avgRR, group = ID)) + geom_line() + ggtitle("Low intensity, Avg RR for off-transient periods")+  ylim(0,80) 
+
+ggplot(data=filter(avgRRon, intensity == "high"), aes(x = bout,y= avgRR, group = ID)) + geom_line() + ggtitle("High intensity, Avg RR for on-transient periods")  + ylim(0,80) 
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgRRoff, intensity == "high"), aes(x = bout,y= avgRR, group = ID)) + geom_line() + ggtitle("High intensity, Avg RR for off-transient periods") + ylim(0,80)  
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgRR ~ bout | ID, data = avgRRon, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgRR ~ bout | ID, data = avgRRon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgRR ~ bout | ID, data = avgRRon, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+# More visualizations
+```{r}
+### categorical variable
+flexplot(avgRR~Gender, data=avgRRon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgRR~Gender, data=avgRRoff, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgRR~Tanner, data=avgRRon, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgRR~Tanner, data=avgRRoff, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remoRR standard errors, and specify 2 bins
+flexplot(avgRR~bout + intensity | Gender + Tanner, data=avgRRon, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgRR~bout + intensity | Gender + Tanner, data=avgRRon)
+flexplot(avgRR~bout + Gender | intensity + Tanner, data=avgRRon)
+flexplot(avgRR~bout + Tanner | intensity + Gender, data=avgRRon)
+```
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgRRon, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgRR~Gender*Tanner*bout + intensity +(bout|ID)  , data = avgRRon, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+```
+
+### Model 1B2: Some interactions
+
+```{r}
+m1C <- lmer(avgRR~ bout*intensity + Tanner + Gender  + (bout|ID)  , data = avgRRon, REML=FALSE)
+# summary(m1C)
+summ(m1C)
+# coef(m1C)
+# ranef(m1C)
+RRon <- m1C
+```
+
+
+## RR OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID) , data = avgRRoff, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# # fixef(m2B)
+# ranef(m2B)
+RRoff <- m2B
+```
+
+
+# VE/VCO2 ratio
+
+##  VE.VCO2 On Transient
+
+First, pull out the average on and off transient VE.VCO2 values for each bout.
+```{r}
+avgVE.VCO2on <- aggregate(ontransbouts$'VE/VCO2', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVE.VCO2on)[6] <- "avgVE.VCO2"
+
+avgVE.VCO2off <- aggregate(offtransbouts$'VE/VCO2', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVE.VCO2off)[6] <- "avgVE.VCO2"
+```
+
+##Plot the average VE/VCO2 data distributions.
+```{r}
+#plot the avg ON-transient VE/VCO2
+ggplot(data=avgVE.VCO2on, aes(bout, avgVE.VCO2, color = intensity)) + geom_point() + ggtitle("On-Transient average VE/VCO2 rates")
+
+#plot the avg off-transient VE/VCO2
+ggplot(data=avgVE.VCO2off, aes(bout, avgVE.VCO2, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VE/VCO2 rates")
+
+ggplot(data=filter(avgVE.VCO2on, intensity == "low"), aes(x = bout,y= avgVE.VCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE/VCO2 for on-transient periods")+ ylim(20,80)
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVE.VCO2off, intensity == "low"), aes(x = bout,y= avgVE.VCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE/VCO2 for off-transient periods")+ ylim(20,80)
+
+ggplot(data=filter(avgVE.VCO2on, intensity == "high"), aes(x = bout,y= avgVE.VCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE/VCO2 for on-transient periods")+ ylim(20,80)
+# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
+
+ggplot(data=filter(avgVE.VCO2off, intensity == "high"), aes(x = bout,y= avgVE.VCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE/VCO2 for off-transient periods") + ylim(20,80)
+```
+
+##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+```{r}
+xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = Gender, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = Tanner, type = c("p","r"), auto.key = TRUE)
+
+xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = intensity, type = c("p","r"), auto.key = TRUE)
+```
+
+# More visualizations
+```{r}
+### categorical variable
+flexplot(avgVE.VCO2~Gender, data=avgVE.VCO2on, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVE.VCO2~Gender, data=avgVE.VCO2off, spread="quartiles", jitter=c(.1, 0))
+
+flexplot(avgVE.VCO2~Tanner, data=avgVE.VCO2on, spread="quartiles", jitter=c(.1, 0))
+flexplot(avgVE.VCO2~Tanner, data=avgVE.VCO2off, spread="quartiles", jitter=c(.1, 0))
+
+### show a straight line, remove standard errors, and specify 2 bins
+flexplot(avgVE.VCO2~bout + intensity | Gender + Tanner, data=avgVE.VCO2on, method="lm", se=F, bins=2)
+
+### multivariate relationship
+flexplot(avgVE.VCO2~bout + intensity | Gender + Tanner, data=avgVE.VCO2on)
+flexplot(avgVE.VCO2~bout + Gender | intensity + Tanner, data=avgVE.VCO2on)
+flexplot(avgVE.VCO2~bout + Tanner | intensity + Gender, data=avgVE.VCO2on)
+```
+
+### Model 1: All interactions
+
+```{r}
+m1 <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+# summary(m1)
+summ(m1)
+# coef(m1)
+# fixef(m1)
+# ranef(m1)
+```
+
+### Model 1B: Some interactions
+
+```{r}
+m1B <- lmer(avgVE.VCO2~Gender*Tanner*bout + intensity +(bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+# summary(m1B)
+summ(m1B)
+# coef(m1B)
+# ranef(m1B)
+```
+
+### Model 1B2: Some interactions
+
+```{r}
+m1C <- lmer(avgVE.VCO2~ bout*intensity + Tanner*intensity + Gender  + (bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+# summary(m1C)
+summ(m1C)
+# coef(m1C)
+# ranef(m1C)
+VE.VCO2on <- m1C
+```
+
+## VE.VCO2 OFF TRANSIENT
+
+### Model 2: All interactions
+
+```{r}
+m2 <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVE.VCO2off, REML=FALSE)
+# summary(m2)
+summ(m2)
+# coef(m2)
+# ranef(m2)
+```
+
+
+### Model 2B: Some interactions
+```{r}
+m2B <- lmer(avgVE.VCO2~ bout*Gender*Tanner + intensity + (bout|ID) , data = avgVE.VCO2off, REML=FALSE)
+# summary(m2B)
+summ(m2B)
+# coef(m2B)
+# # fixef(m2B)
+# ranef(m2B)
+```
+
+### Model 2C: Some interactions
+```{r}
+m2C <- lmer(avgVE.VCO2~ bout*intensity + Gender +Tanner* intensity + (bout|ID) , data = avgVE.VCO2off, REML=FALSE)
+# summary(m2C)
+summ(m2C)
+# coef(m2C)
+# # fixef(m2C)
+# ranef(m2C)
+VE.VCO2off <- m2C
+```
+
+
+# Predicted Values
+
+## Predict and visualize the linear models.
+
+```{r}
+# Another way to do this is with plot_model:  
+# plot_model(HRon, type = "pred", terms = c("bout", "Tanner", "intensity"))
+
+dat.HRon <- ggpredict(HRon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.HRon,"~/R/MBEB-CPET/output/dat.HRon.csv", row.names = FALSE)
+plot(dat.HRon)
+
+dat.HRoff <- ggpredict(HRoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.HRoff,"~/R/MBEB-CPET/output/dat.HRoff.csv", row.names = FALSE)
+plot(dat.HRoff)
+
+dat.VO2KGon <- ggpredict(VO2KGon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VO2KGon,"~/R/MBEB-CPET/output/dat.VO2KGon.csv", row.names = FALSE)
+plot(dat.VO2KGon)
+
+dat.VO2KGoff <- ggpredict(VO2KGoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VO2KGoff,"~/R/MBEB-CPET/output/dat.VO2KGoff.csv", row.names = FALSE)
+plot(dat.VO2KGoff)
+
+dat.VO2KGLBMon <- ggpredict(VO2KGLBMon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VO2KGLBMon,"~/R/MBEB-CPET/output/dat.VO2KGLBMon.csv", row.names = FALSE)
+plot(dat.VO2KGLBMon)
+
+dat.VO2KGLBMoff <- ggpredict(VO2KGLBMoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VO2KGLBMoff,"~/R/MBEB-CPET/output/dat.VO2KGLBMoff.csv", row.names = FALSE)
+plot(dat.VO2KGLBMoff)
+
+dat.VCO2on <- ggpredict(VCO2on, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VCO2on,"~/R/MBEB-CPET/output/dat.VCO2on.csv", row.names = FALSE)
+plot(dat.VCO2on)
+
+dat.VCO2off <- ggpredict(VCO2off, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VCO2off,"~/R/MBEB-CPET/output/dat.VCO2off.csv", row.names = FALSE)
+plot(dat.VCO2off)
+
+dat.VCO2kglbmon <- ggpredict(VCO2kglbmon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VCO2kglbmon,"~/R/MBEB-CPET/output/dat.VCO2kglbmon.csv", row.names = FALSE)
+plot(dat.VCO2kglbmon)
+
+dat.VCO2kglbmoff <- ggpredict(VCO2kglbmoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VCO2kglbmoff,"~/R/MBEB-CPET/output/dat.VCO2kglbmoff.csv", row.names = FALSE)
+plot(dat.VCO2kglbmoff)
+
+dat.RQon <- ggpredict(RQon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.RQon,"~/R/MBEB-CPET/output/dat.RQon.csv", row.names = FALSE)
+plot(dat.RQon)
+
+dat.RQoff <- ggpredict(RQoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.RQoff,"~/R/MBEB-CPET/output/dat.RQoff.csv", row.names = FALSE)
+plot(dat.RQoff)
+
+dat.VEkglbmon <- ggpredict(VEkglbmon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VEkglbmon,"~/R/MBEB-CPET/output/dat.VEkglbmon.csv", row.names = FALSE)
+plot(dat.VEkglbmon)
+
+dat.VEkglbmon <- ggpredict(VEkglbmon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VEkglbmon,"~/R/MBEB-CPET/output/dat.VEkglbmon.csv", row.names = FALSE)
+plot(dat.VEkglbmon)
+
+dat.VEkglbmoff <- ggpredict(VEkglbmoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VEkglbmoff,"~/R/MBEB-CPET/output/dat.VEkglbmoff.csv", row.names = FALSE)
+plot(dat.VEkglbmoff)
+
+dat.RRon <- ggpredict(RRon, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.RRon,"~/R/MBEB-CPET/output/dat.RRon.csv", row.names = FALSE)
+plot(dat.RRon)
+
+dat.RRoff <- ggpredict(RRoff, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.RRoff,"~/R/MBEB-CPET/output/dat.RRoff.csv", row.names = FALSE)
+plot(dat.RRoff)
+
+dat.VE.VCO2on <- ggpredict(VE.VCO2on, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VE.VCO2on,"~/R/MBEB-CPET/output/dat.VE.VCO2on.csv", row.names = FALSE)
+plot(dat.VE.VCO2on)
+
+dat.VE.VCO2off <- ggpredict(VE.VCO2off, terms = c("bout","Gender", "Tanner", "intensity"))
+write.csv(dat.VE.VCO2off,"~/R/MBEB-CPET/output/dat.VE.VCO2off.csv", row.names = FALSE)
+plot(dat.VE.VCO2off)
+
+```
+
+```{r}
+names(dat.HRon)[6:8] <- c("Gender", "Tanner", "intensity")
+names(dat.HRon)[1:2] <- c("x","avgHR")
+
+dat.HRon$x <- as.factor(dat.HRon$x)
+
+# Facet_grid allows us to see a different dot plot for each group's summary stats
+ggplot(dat.HRon, aes(x, avgHR)) + geom_point(aes(shape = Tanner))+
+  geom_errorbar(
+    aes(ymin = conf.low, ymax = conf.high
+        , color = Gender
+        ),
+    position = position_dodge(0.2), width = 0.2
+  ) + facet_grid(Gender~Tanner~intensity) +labs(title="Predicted Average HR at each bout",x="bout", y = "Average HR") +theme_bw()
+```
+
+```{r}
+plot_summs(VCO2on, VCO2off, scale = TRUE, 
+           # inner_ci_level = .95, 
+           plot.distributions = F)
+```
+
+# Printing the model results as tables
+## Tab_model version
+
+ Adjust file name in the tab_model function to specify html save location.
+```{r}
+allmodels <- c(HRon, HRoff, VO2KGLBMon,VO2KGLBMoff, VCO2kglbmon,VCO2kglbmoff,RQon,RQoff,VEkglbmon,VEkglbmoff,RRon,RRoff,VE.VCO2on, VE.VCO2off)
+
+tab_model(allmodels, 
+          show.reflvl = F, 
+          auto.label=TRUE, 
+          dv.labels = c("HR (on)", "HR (off)", "VO2/kg (on)", "VO2/kg (off)", "VCO2/kg (on)", "VCO2/kg (off)", "RQ (on)", "RQ (off)", "VE/kg (on)", "VE/kg (off)", "RR (on)", "RR (off)", "VE/VCO2 (on)", "VE/VCO2 (off)"),
+          CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+```
+
+## Individual tab_models
+```{r}
+HRmodels <- c(HRon, HRoff)
+tab_model(HRmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("HR (exercise)", "HR (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VO2KGmodels <- c(VO2KGon, VO2KGoff)
+tab_model(VO2KGmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VO2/kg (exercise)", "VO2/kg (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VO2KGLBMmodels <- c(VO2KGLBMon, VO2KGLBMoff)
+tab_model(VO2KGLBMmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VO2/kg (exercise)", "VO2/kg (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VCO2models <- c(VCO2on, VCO2off)
+tab_model(VCO2models, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VCO2 (exercise)", "VCO2 (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VCO2kglbmmodels <- c(VCO2kglbmon, VCO2kglbmoff)
+tab_model(VCO2kglbmmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VCO2/kg (exercise)", "VCO2/kg (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+RQmodels <- c(RQon, RQoff)
+tab_model(RQmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("RQ (exercise)", "RQ (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VEmodels <- c(VEon, VEoff)
+tab_model(VEmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VE (exercise)", "VE (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VEkglbmmodels <- c(VEkglbmon, VEkglbmoff)
+tab_model(VEkglbmmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VE/kg (exercise)", "VE/kg (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+RRmodels <- c(RRon, RRoff)
+tab_model(RRmodels, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("RR (exercise)", "RR (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+
+VE.VCO2models <- c(VE.VCO2on, VE.VCO2off)
+tab_model(VE.VCO2models, show.reflvl = F, auto.label=TRUE 
+          # ,prefix.labels ="varname"
+          , dv.labels = c("VE/VCO2 (exercise)", "VE/VCO2 (rest)")
+          , CSS = css_theme("cells")
+          # ,file = "C:/Users/__.html"
+          )
+```
+
+
+# Computing Least Squares means & contrast differences
+
+```{r}
+#Use this when bout is coded as numeric!
+
+(lsm.HRon <- lsmeans(HRon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.HRoff <- lsmeans(HRoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+
+(lsm.VO2KGon <- lsmeans(VO2KGon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VO2KGoff <- lsmeans(VO2KGoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+         ))
+```
+
+```{r}
+(lsm.VCO2on <- lsmeans(VCO2on,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VCO2off <- lsmeans(VCO2off,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VCO2kglbmon <- lsmeans(VCO2kglbmon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+
+(lsm.VCO2kglbmoff <- lsmeans(VCO2kglbmoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VEon <- lsmeans(VEon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VEoff <- lsmeans(VEoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.RQon <- lsmeans(RQon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.RQoff <- lsmeans(RQoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.RRon <- lsmeans(RRon,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.RRoff <- lsmeans(RRoff,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VE.VCO2on <- lsmeans(VE.VCO2on,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+```{r}
+(lsm.VE.VCO2off <- lsmeans(VE.VCO2off,
+        pairwise ~ Tanner*Gender|intensity,
+        adjust = "tukey"
+        ))
+```
+
+
+# residuals analysis
+```{r}
+HRonresiduals <- resid(HRon)
+summary(HRonresiduals)
+hist(HRonresiduals)
+print(dotplot(ranef(HRon,condVar=TRUE)))
+```
+```{r}
+HRoffresiduals <- resid(HRoff)
+summary(HRoffresiduals)
+hist(HRoffresiduals)
+print(dotplot(ranef(HRoff,condVar=TRUE)))
+```
+```{r}
+VO2KGLBMonresiduals <- resid(VO2KGLBMon)
+summary(VO2KGLBMonresiduals)
+hist(VO2KGLBMonresiduals)
+print(dotplot(ranef(VO2KGLBMon,condVar=TRUE)))
+```
+```{r}
+VO2KGLBMoffresiduals <- resid(VO2KGLBMoff)
+summary(VO2KGLBMoffresiduals)
+hist(VO2KGLBMoffresiduals)
+print(dotplot(ranef(VO2KGLBMoff,condVar=TRUE)))
+```
+```{r}
+VCO2kglbmonresiduals <- resid(VCO2kglbmon)
+summary(VCO2kglbmonresiduals)
+hist(VCO2kglbmonresiduals)
+print(dotplot(ranef(VCO2kglbmon,condVar=TRUE)))
+```
+```{r}
+VCO2kglbmoffresiduals <- resid(VCO2kglbmoff)
+summary(VCO2kglbmoffresiduals)
+hist(VCO2kglbmoffresiduals)
+print(dotplot(ranef(VCO2kglbmoff,condVar=TRUE)))
+```
+```{r}
+VEkglbmonresiduals <- resid(VEkglbmon)
+summary(VEkglbmonresiduals)
+hist(VEkglbmonresiduals)
+print(dotplot(ranef(VEkglbmon,condVar=TRUE)))
+```
+```{r}
+VEkglbmoffresiduals <- resid(VEkglbmoff)
+summary(VEkglbmoffresiduals)
+hist(VEkglbmoffresiduals)
+print(dotplot(ranef(VEkglbmoff,condVar=TRUE)))
+```
+```{r}
+RQonresiduals <- resid(RQon)
+summary(RQonresiduals)
+hist(RQonresiduals)
+print(dotplot(ranef(RQon,condVar=TRUE)))
+```
+```{r}
+RQoffresiduals <- resid(RQoff)
+summary(RQoffresiduals)
+hist(RQoffresiduals)
+print(dotplot(ranef(RQoff,condVar=TRUE)))
+```
+```{r}
+RRonresiduals <- resid(RRon)
+summary(RRonresiduals)
+hist(RRonresiduals)
+print(dotplot(ranef(RRon,condVar=TRUE)))
+```
+```{r}
+RRoffresiduals <- resid(RRoff)
+summary(RRoffresiduals)
+hist(RRoffresiduals)
+print(dotplot(ranef(RRoff,condVar=TRUE)))
+```
+```{r}
+VE.VCO2onresiduals <- resid(VE.VCO2on)
+summary(VE.VCO2onresiduals)
+hist(VE.VCO2onresiduals)
+print(dotplot(ranef(VE.VCO2on,condVar=TRUE)))
+```
+```{r}
+VE.VCO2offresiduals <- resid(VE.VCO2off)
+plot(resid(VE.VCO2off))
+summary(VE.VCO2offresiduals)
+hist(VE.VCO2offresiduals)
+print(dotplot(ranef(VE.VCO2off,condVar=TRUE)))
+```
+
+
