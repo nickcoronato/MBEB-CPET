@@ -1,0 +1,1634 @@
+---
+title: "post-hoc-stats"
+author: "nickcoronato"
+date: "2021-07-27"
+output: workflowr::wflow_html
+editor_options:
+  chunk_output_type: console
+---
+```{r load libraries, echo = FALSE}
+# Call the appropriate libraries.
+library(tidyverse)
+library(plyr)
+library(dplyr)
+library(splines)
+library(boot)
+library(broom)
+library(lme4)
+library(lmerTest)
+library(jtools)
+library(devtools)
+library(lattice)
+library(fifer)
+library(flexplot)
+library(sjPlot)
+library(officer)
+library(flextable)
+library(lsmeans)
+library(effects)
+library(ggiraph)
+library(ggiraphExtra)
+library(ggeffects)
+library(emmeans)
+```
+
+# Data preparation
+
+## Read in the csv of clean data, from this project's "Data" folder.
+```{r Read in data, message = FALSE, include = FALSE}
+here::i_am("analysis/MixedEffectsCPETmodels.Rmd")
+library(here)
+
+all_GK_raw  <-  read_delim(here("data","all_data.csv"),"," ) #This is the raw data set
+
+# This next step divides the full time series for each subject into their 5-10 Exercise and Recovery bouts. Bouts labelled with a ".5" suffix are the recovery (off-transient) bouts.
+
+all_GK_bybout <- mutate(all_GK_raw, 
+                        bout =case_when(
+  (Time_Sec<120 & Work < 10)~"0",
+  (Time_Sec >= 2 & Time_Sec < 175 & Work >=10)~"1",
+  (Time_Sec<185 & Work < 10)~"1.5",
+  (Time_Sec >= 175 & Time_Sec<300 & Work >=10)~"2",
+  (Time_Sec<365 & Work < 10)~"2.5",
+  (Time_Sec >= 300 & Time_Sec < 495 & Work >=10)~"3",
+  (Time_Sec<545 & Work < 10)~"3.5",
+  (Time_Sec >= 495 & Time_Sec <675 & Work >=10)~"4",
+  (Time_Sec<725 & Work < 10)~"4.5",
+  (Time_Sec >= 675 & Time_Sec <855 & Work >=10)~"5",
+  (Time_Sec<905 & Work < 10)~"5.5", 
+  (Time_Sec >= 855 & Time_Sec <1035 & Work >= 10)~"6", 
+  (Time_Sec<1085 & Work < 10)~"6.5", 
+  (Time_Sec >= 1035 & Time_Sec <1215 & Work >= 10)~"7", 
+  (Time_Sec<1265 & Work < 10)~"7.5",
+  (Time_Sec >= 1215 & Time_Sec <1400 & Work >= 10)~"8", 
+  (Time_Sec <1445 & Work < 10)~"8.5",
+  (
+    # Time_Sec >= 1400 & 
+      Time_Sec <1575 & Work >= 10)~"9",
+  (
+    # Time_Sec >= 1540 & 
+     Time_Sec<1625 & Work < 10)~"9.5",
+  (Time_Sec >= 1575 & Work >= 10)~"10", 
+  (Time_Sec >= 1625 & Work < 10)~"10.5"))
+
+names(all_GK_bybout)[13] <- "Tanner"
+# 'Tanner' column is the descriptor for the puberty variable. Early pubertal subjects score 1-2 on the Tanner scale, and late pubertal subjects score 4-5.
+
+# The next step ensures that we have all variables of interest. Note that some are normalized by bodymass (kg) and lean body mass (kg), which are slightly different measurements.
+all_GK_bybout <- mutate(all_GK_bybout, "VO2/kglbm"=VO2 / lbm,"VE/VCO2" = (VE / VCO2),"VCO2/kg" =  VCO2/bodymass,"VE/kg" = VE/bodymass, "VCO2/kglbm" =  VCO2/lbm,"VE/kglbm" = VE/lbm)
+
+
+# All variables should be coded as Factors, with the exception of bout, which is our discrete repeated measure.
+all_GK_bybout$Tanner <- as.factor(all_GK_bybout$Tanner)
+all_GK_bybout$Gender <- as.factor(all_GK_bybout$Gender)
+all_GK_bybout$intensity <- as.factor(all_GK_bybout$intensity)
+# all_GK_bybout$bout <- as.factor(all_GK_bybout$bout)
+all_GK_bybout$ID <- as.factor(all_GK_bybout$ID)
+
+
+all_GK_bybout <- all_GK_bybout %>% dplyr::select(ID, bodymass, lbm, intensity, Tanner, Gender, bout, Time_Sec, Work, HR, VO2, 'VO2/kg', 'VO2/kglbm', VCO2, 'VCO2/kg', 'VCO2/kglbm', RQ, VE, 'VE/kg','VE/kglbm', RR, `VE/VCO2`)
+all_GK_bybout <- as_tibble(all_GK_bybout)
+
+head(all_GK_bybout,6)
+
+# Check for any NA values in bout column.
+(extra_NA <- all_GK_bybout[is.na(all_GK_bybout$bout),])
+```
+
+## Convert the 'bout' variable to discrete numeric values. For the off-transient bouts (recovery periods), subtract 1.5 in order to center the variable at 0 for further analysis.
+```{r Convert bout var, message=FALSE, warning=FALSE}
+ontransbouts <- filter(all_GK_bybout,bout%in%c(0,1,2,3,4,5))
+ontransbouts$bout <- as.numeric(ontransbouts$bout)
+
+offtransbouts <- filter(all_GK_bybout,bout%in%c(1.5,2.5,3.5,4.5,5.5,6.5))
+offtransbouts$bout <- as.numeric(offtransbouts$bout)
+offtransbouts <- mutate(offtransbouts, bout = bout-1.5)
+```
+
+## Compute the averages. Pull out the 'avgHR' at each "on-transient" and "off-transient" bout (1-5).
+```{r compute avgHR}
+avgHRon <- aggregate(ontransbouts$HR, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgHRon)[6] <- "avgHR"
+
+avgHRoff <- aggregate(offtransbouts$HR, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgHRoff)[6] <- "avgHR"
+```
+```{r compute vo2kglbm avg}
+avgVO2kglbmon <- aggregate(ontransbouts$'VO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVO2kglbmon)[6] <- "avgVO2kglbm"
+
+avgVO2kglbmoff <- aggregate(offtransbouts$'VO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVO2kglbmoff)[6] <- "avgVO2kglbm"
+```
+```{r compute VCO2kglbm avg}
+avgVCO2kglbmon <- aggregate(ontransbouts$'VCO2/kglbm', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVCO2kglbmon)[6] <- "avgVCO2kglbm"
+
+avgVCO2kglbmoff <- aggregate(offtransbouts$'VCO2/kglbm', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVCO2kglbmoff)[6] <- "avgVCO2kglbm"
+```
+```{r compute RQ avg}
+avgRQon <- aggregate(ontransbouts$RQ, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgRQon)[6] <- "avgRQ"
+
+avgRQoff <- aggregate(offtransbouts$RQ, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgRQoff)[6] <- "avgRQ"
+```
+```{r}
+avgVEkglbmon <- aggregate(ontransbouts$'VE/kglbm', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVEkglbmon)[6] <- "avgVEkglbm"
+
+avgVEkglbmoff <- aggregate(offtransbouts$'VE/kglbm', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVEkglbmoff)[6] <- "avgVEkglbm"
+```
+```{r}
+avgRRon <- aggregate(ontransbouts$RR, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgRRon)[6] <- "avgRR"
+
+avgRRoff <- aggregate(offtransbouts$RR, by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgRRoff)[6] <- "avgRR"
+```
+```{r}
+avgVE.VCO2on <- aggregate(ontransbouts$'VE/VCO2', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
+names(avgVE.VCO2on)[6] <- "avgVE.VCO2"
+
+avgVE.VCO2off <- aggregate(offtransbouts$'VE/VCO2', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
+names(avgVE.VCO2off)[6] <- "avgVE.VCO2"
+```
+
+#Post-hoc comparisons of means
+
+## HRon Nested data
+
+A factor A is nested in another factor B if the levels of A have a different meaning in one level of B than in another. Often, nested factors are random effects—for example, subjects in an experiment may be randomly assigned to treatments, in which case subjects are nested in treatments—and if we model them as random effects, these random nested effects are not among the fixed effects and are not an issue to emmeans. But sometimes we have fixed nested factors.
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgHRon$bout <- as.numeric(avgHRon$bout)
+avgHRon$bout <- as.factor(avgHRon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+HRon <- lmer(avgHR~Gender+Tanner*bout * intensity + (bout|ID)  , data = avgHRon, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+HRon.emm <- emmeans(HRon, ~ bout |intensity*Gender*Tanner)
+HRon.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+HRon.emm.df <-
+  HRon.emm %>%
+  broom::tidy()
+
+HRon.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+
+'Bout' is treated as a factor in the model, but it corresponds to equally-spaced values of a numeric variable. In such cases, users often want to compute orthogonal polynomial contrasts:
+to see if there was a linear or quadratic change in response over bouts.
+
+This could provide an answer to our hypothesis, whether the response variable is increasing or decreasing significantly over bouts.
+
+It is important to understand that the estimated linear contrast is not the slope of a line fitted to the data. It is simply a contrast having coefficients that increase linearly. It does test the linear trend, however.
+
+It appears that there is a positive linear trend over bouts (a quadratic trend is also indicated and reported here):
+```{r}
+contrast(HRon.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+https://timmastny.rbind.io/blog/tests-pairwise-categorical-mean-emmeans-contrast/#consecutive-comparisons
+
+This will show us before and after mean comparisons. It’s similar to consecutive comparisons, because it often only makes sense for sequential factors like time.
+
+This one’s also unique, because the unit of comparison is not necessarily an individual member of a category, but rather groups compared to other groups.
+
+This type of analysis is useful for non-linear trends, where you want to identity the change point (hence the name before and after).
+
+ 
+```{r}
+HRon %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout.  
+```{r}
+HRon %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+HRonpairs <- pairs(HRon.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+print(HRonpairs)
+```
+
+```{r}
+# HRon.rg <- ref_grid(HRon
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(HRon.rg)                    
+# HRon.rg
+```
+
+### Graphs with nesting
+
+```{r}
+# plot(HRon.emm, PIs = TRUE) + 
+#     facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(HRon.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.
+
+To visualize the lines themselves:
+```{r}
+emmip(HRon, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(HRon, group = "bout",slope = TRUE, id = F)
+```
+
+
+## HRoff Nested data
+
+```{r}
+# avgHRoff$bout <- as.numeric(avgHRoff$bout)
+avgHRoff$bout <- as.factor(avgHRoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+HRoff <- lmer(avgHR~ bout * intensity + Tanner*intensity + Gender*intensity + (bout|ID)  ,  data = avgHRoff, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+HRoff.emm <- emmeans(HRoff, ~ bout |intensity*Gender*Tanner)
+HRoff.emm
+```
+
+It might be nice to extract these estimates and plot them:
+```{r}
+HRoff.emm.df <-
+  HRoff.emm %>%
+  broom::tidy()
+
+HRoff.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+### Checking for polynomial contrasts
+
+'Bout' is treated as a factor in the model, but it corresponds to equally-spaced values of a numeric variable. In such cases, users often want to compute orthogonal polynomial contrasts:
+to see if there was a linear or quadratic change in response over bouts.
+
+This could provide an answer to our hypothesis, whether the response variable is increasing or decreasing significantly over bouts.
+
+It is important to understand that the estimated linear contrast is not the slope of a line fitted to the data. It is simply a contrast having coefficients that increase linearly. It does test the linear trend, however.
+
+It appears that there is a positive linear trend over bouts (a quadratic trend is also indicated and reported here):
+```{r}
+contrast(HRoff.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+https://timmastny.rbind.io/blog/tests-pairwise-categorical-mean-emmeans-contrast/#consecutive-comparisons
+
+This will show us before and after mean comparisons. It’s similar to consecutive comparisons, because it often only makes sense for sequential factors like time.
+
+This one’s also unique, because the unit of comparison is not necessarily an individual member of a category, but rather groups compared to other groups.
+
+This type of analysis is useful for non-linear trends, where you want to identity the change point (hence the name before and after).
+ 
+```{r}
+HRoff %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout.  
+```{r}
+HRoff %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+HRoffpairs <- pairs(HRoff.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+print(HRoffpairs)
+```
+
+```{r}
+# HRoff.rg <- ref_grid(HRoff
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(HRoff.rg)                    
+# HRoff.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(HRoff.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(HRoff.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor. 
+
+To visualize the lines themselves:
+
+```{r}
+emmip(HRoff, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+
+```{r}
+library(predictmeans)
+residplot(HRoff, group = "bout",slope = TRUE, id = FALSE)
+```
+
+## VO2on Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgVO2kglbmon$bout <- as.numeric(avgVO2kglbmon$bout)
+avgVO2kglbmon$bout <- as.factor(avgVO2kglbmon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VO2on <- lmer(avgVO2kglbm~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VO2on.emm <- emmeans(VO2on, ~ bout |intensity*Gender*Tanner)
+VO2on.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VO2on.emm.df <-
+  VO2on.emm %>%
+  broom::tidy()
+
+VO2on.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+### Checking for polynomial contrasts
+
+'Bout' is treated as a factor in the model, but it corresponds to equally-spaced values of a numeric variable. In such cases, users often want to compute orthogonal polynomial contrasts:
+to see if there was a linear or quadratic change in response over bouts.
+
+This could provide an answer to our hypothesis, whether the response variable is increasing or decreasing significantly over bouts.
+
+It is important to understand that the estimated linear contrast is not the slope of a line fitted to the data. It is simply a contrast having coefficients that increase linearly. It does test the linear trend, however.
+
+It appears that there is a positive linear trend over bouts (a quadratic trend is also indicated and reported here):
+```{r}
+contrast(VO2on.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+https://timmastny.rbind.io/blog/tests-pairwise-categorical-mean-emmeans-contrast/#consecutive-comparisons
+
+This will show us before and after mean comparisons. It’s similar to consecutive comparisons, because it often only makes sense for sequential factors like time.
+
+This one’s also unique, because the unit of comparison is not necessarily an individual member of a category, but rather groups compared to other groups.
+
+This type of analysis is useful for non-linear trends, where you want to identity the change point (hence the name before and after).
+
+```{r}
+VO2on %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout. However, all of the statistically significant estimates are POSITIVE, indicating a positive trend for VO2 on transient.
+```{r}
+VO2on %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VO2onpairs <- pairs(VO2on.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+print(VO2onpairs)
+```
+
+```{r}
+VO2on.rg <- ref_grid(VO2on
+                    # , nesting = (Gender*Tanner) %in% intensity
+                    )
+
+str(VO2on.rg)                    
+VO2on.rg
+```
+### Graphs with nesting
+```{r}
+plot(VO2on.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+coef(pairs(VO2on.emm))
+```
+
+### Interactions with covariates
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VO2on, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VO2on, group = "bout",slope = TRUE, id = FALSE)
+```
+
+## VO2off Nested data
+
+```{r}
+# avgVO2kglbmoff$bout <- as.numeric(avgVO2kglbmoff$bout)
+avgVO2kglbmoff$bout <- as.factor(avgVO2kglbmoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VO2off <- lmer(avgVO2kglbm~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VO2off.emm <- emmeans(VO2off, ~ bout |intensity*Gender*Tanner)
+VO2off.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VO2off.emm.df <-
+  VO2off.emm %>%
+  broom::tidy()
+
+VO2off.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+
+'Bout' is treated as a factor in the model, but it corresponds to equally-spaced values of a numeric variable. In such cases, users often want to compute orthogonal polynomial contrasts:
+to see if there was a linear or quadratic change in response over bouts.
+
+This could provide an answer to our hypothesis, whether the response variable is increasing or decreasing significantly over bouts.
+
+It is important to understand that the estimated linear contrast is not the slope of a line fitted to the data. It is simply a contrast having coefficients that increase linearly. It does test the linear trend, however.
+
+It appears that there is a positive linear trend over bouts (a quadratic trend is also indicated and reported here):
+```{r}
+contrast(VO2off.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+https://timmastny.rbind.io/blog/tests-pairwise-categorical-mean-emmeans-contrast/#consecutive-comparisons
+
+This will show us before and after mean comparisons. It’s similar to consecutive comparisons, because it often only makes sense for sequential factors like time.
+
+This one’s also unique, because the unit of comparison is not necessarily an individual member of a category, but rather groups compared to other groups.
+
+This type of analysis is useful for non-linear trends, where you want to identity the change point (hence the name before and after).
+
+ 
+```{r}
+VO2off %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout. However, all of the statistically significant estimates are POSITIVE, indicating a positive trend for VO2 on transient.
+```{r}
+VO2off %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VO2offpairs <- pairs(VO2off.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VO2offpairs)
+```
+
+```{r}
+# VO2off.rg <- ref_grid(VO2off
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VO2off.rg)                    
+# VO2off.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VO2off.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(VO2off.emm))
+```
+
+### Interactions with covariates
+To visualize the lines themselves:
+
+```{r}
+emmip(VO2off, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VO2off, group = "bout",slope = TRUE, id = FALSE)
+```
+## VCO2on Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgVCO2kglbmon$bout <- as.numeric(avgVCO2kglbmon$bout)
+avgVCO2kglbmon$bout <- as.factor(avgVCO2kglbmon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VCO2on <- lmer(avgVCO2kglbm~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2kglbmon, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VCO2on.emm <- emmeans(VCO2on, ~ bout |intensity*Gender*Tanner)
+VCO2on.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VCO2on.emm.df <-
+  VCO2on.emm %>%
+  broom::tidy()
+
+VCO2on.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+
+'Bout' is treated as a factor in the model, but it corresponds to equally-spaced values of a numeric variable. In such cases, users often want to compute orthogonal polynomial contrasts:
+to see if there was a linear or quadratic change in response over bouts.
+
+This could provide an answer to our hypothesis, whether the response variable is increasing or decreasing significantly over bouts.
+
+It is important to understand that the estimated linear contrast is not the slope of a line fitted to the data. It is simply a contrast having coefficients that increase linearly. It does test the linear trend, however.
+
+It appears that there is a positive linear trend over bouts (a quadratic trend is also indicated and reported here):
+```{r}
+contrast(VCO2on.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+VCO2on %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+VCO2on %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r paged.print=TRUE}
+VCO2onpairs <- pairs(VCO2on.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VCO2onpairs)
+```
+```{r}
+# VCO2on.rg <- ref_grid(VCO2on
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VCO2on.rg)                    
+# VCO2on.rg
+```
+
+### Graphs with nesting
+
+```{r}
+plot(VCO2on.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(VCO2on.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VCO2on, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VCO2on, group = "bout",slope = TRUE, id = FALSE)
+```
+## VCO2off Nested data
+
+```{r}
+# avgVCO2kglbmoff$bout <- as.numeric(avgVCO2kglbmoff$bout)
+avgVCO2kglbmoff$bout <- as.factor(avgVCO2kglbmoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VCO2off <- lmer(avgVCO2kglbm ~ bout + Gender*intensity +Tanner*intensity + (bout|ID),  data = avgVCO2kglbmoff, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VCO2off.emm <- emmeans(VCO2off, ~ bout |intensity*Gender*Tanner)
+VCO2off.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VCO2off.emm.df <-
+  VCO2off.emm %>%
+  broom::tidy()
+
+VCO2off.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(VCO2off.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+VCO2off %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout. However, all of the statistically significant estimates are POSITIVE, indicating a positive trend for VCO2 on transient.
+```{r}
+VCO2off %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VCO2offpairs <- pairs(VCO2off.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VCO2offpairs)
+```
+
+```{r}
+# VCO2off.rg <- ref_grid(VCO2off
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VCO2off.rg)                    
+# VCO2off.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VCO2off.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(VCO2off.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VCO2off, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VCO2off, group = "bout",slope = TRUE, id = FALSE)
+```
+## RQon Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgRQon$bout <- as.numeric(avgRQon$bout)
+avgRQon$bout <- as.factor(avgRQon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+RQon <- lmer(avgRQ~ Tanner*intensity + Gender + bout +(bout|ID)  , data = avgRQon, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+RQon.emm <- emmeans(RQon, ~ bout |intensity*Gender*Tanner)
+RQon.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+RQon.emm.df <-
+  RQon.emm %>%
+  broom::tidy()
+
+RQon.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(RQon.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+RQon %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+Consecutive marginal means comparisons show varying levels of significance when comparing one Bout to the following Bout. However, all of the statistically significant estimates are POSITIVE, indicating a positive trend for RQ on transient.
+```{r}
+RQon %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+RQonpairs <- pairs(RQon.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(RQonpairs)
+```
+```{r}
+# RQon.rg <- ref_grid(RQon
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# str(RQon.rg)                    
+# RQon.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(RQon.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(RQon.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(RQon, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(RQon, group = "bout",slope = TRUE, id = FALSE)
+```
+## RQoff Nested data
+
+```{r}
+# avgRQoff$bout <- as.numeric(avgRQoff$bout)
+avgRQoff$bout <- as.factor(avgRQoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+RQoff <-  lmer(avgRQ~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID)  ,  data = avgRQoff, REML=TRUE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+RQoff.emm <- emmeans(RQoff, ~ bout |intensity*Gender*Tanner)
+RQoff.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+RQoff.emm.df <-
+  RQoff.emm %>%
+  broom::tidy()
+
+RQoff.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(RQoff.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+RQoff %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+RQoff %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+RQoffpairs <- pairs(RQoff.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(RQoffpairs)
+```
+```{r}
+# RQoff.rg <- ref_grid(RQoff
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(RQoff.rg)
+# RQoff.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(RQoff.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(RQoff.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(RQoff, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(RQoff, group = "bout",slope = TRUE, id = FALSE)
+```
+## VEon Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgVEkglbmon$bout <- as.numeric(avgVEkglbmon$bout)
+avgVEkglbmon$bout <- as.factor(avgVEkglbmon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VEon <- lmer(avgVEkglbm~bout + Gender + Tanner*intensity +(bout|ID)  , data = avgVEkglbmon, REML=TRUE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VEon.emm <- emmeans(VEon, ~ bout |intensity*Gender*Tanner)
+VEon.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VEon.emm.df <-
+  VEon.emm %>%
+  broom::tidy()
+
+VEon.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+```{r}
+contrast(VEon.emm, "poly", max.degree = 2)
+```
+
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+VEon %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+VEon %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VEonpairs <- pairs(VEon.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VEonpairs)
+```
+```{r}
+# VEon.rg <- ref_grid(VEon
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VEon.rg)                    
+# VEon.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VEon.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+# 
+# coef(pairs(VEon.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VEon, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VEon, group = "bout",slope = TRUE, id = FALSE)
+```
+## VEoff Nested data
+
+```{r}
+# avgVEkglbmoff$bout <- as.numeric(avgVEkglbmoff$bout)
+avgVEkglbmoff$bout <- as.factor(avgVEkglbmoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VEoff <- lmer(avgVEkglbm~Gender*intensity + bout*intensity + Tanner*intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VEoff.emm <- emmeans(VEoff, ~ bout |intensity*Gender*Tanner)
+VEoff.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VEoff.emm.df <-
+  VEoff.emm %>%
+  broom::tidy()
+
+VEoff.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(VEoff.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+VEoff %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+VEoff %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VEoffpairs <- pairs(VEoff.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VEoffpairs)
+```
+
+```{r}
+# VEoff.rg <- ref_grid(VEoff
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VEoff.rg)                    
+# VEoff.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VEoff.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(VEoff.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VEoff, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VEoff, group = "bout",slope = TRUE, id = FALSE)
+```
+## RRon Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgRRon$bout <- as.numeric(avgRRon$bout)
+avgRRon$bout <- as.factor(avgRRon$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+RRon <- lmer(avgRR~ bout*intensity + Tanner + Gender  + (bout|ID)  , data = avgRRon, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+RRon.emm <- emmeans(RRon, ~ bout |intensity*Gender*Tanner)
+RRon.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+RRon.emm.df <-
+  RRon.emm %>%
+  broom::tidy()
+
+RRon.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(RRon.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+
+```{r}
+RRon %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+RRon %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+RRonpairs <- pairs(RRon.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(RRonpairs)
+```
+```{r}
+# RRon.rg <- ref_grid(RRon
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(RRon.rg)                    
+# RRon.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(RRon.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(RRon.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(RRon, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(RRon, group = "bout",slope = TRUE, id = FALSE)
+```
+
+## RRoff Nested data
+
+```{r}
+# avgRRoff$bout <- as.numeric(avgRRoff$bout)
+avgRRoff$bout <- as.factor(avgRRoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+RRoff <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+RRoff.emm <- emmeans(RRoff, ~ bout |intensity*Gender*Tanner)
+RRoff.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+RRoff.emm.df <-
+  RRoff.emm %>%
+  broom::tidy()
+
+RRoff.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(RRoff.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+RRoff %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+RRoff %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+RRoffpairs <- pairs(RRoff.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(RRoffpairs)
+```
+```{r}
+# RRoff.rg <- ref_grid(RRoff
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(RRoff.rg)                    
+# RRoff.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(RRoff.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(RRoff.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(RRoff, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(RRoff, group = "bout",slope = TRUE, id = FALSE)
+```
+## VE.VCO2on Nested data
+
+For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
+
+```{r}
+# avgVE.VCO2on$bout <- as.numeric(avgVE.VCO2on$bout)
+avgVE.VCO2on$bout <- as.factor(avgVE.VCO2on$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VE.VCO2on <- lmer(avgVE.VCO2~ bout*intensity + Tanner*intensity + Gender  + (bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VE.VCO2on.emm <- emmeans(VE.VCO2on, ~ bout |intensity*Gender*Tanner)
+VE.VCO2on.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VE.VCO2on.emm.df <-
+  VE.VCO2on.emm %>%
+  broom::tidy()
+
+VE.VCO2on.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response")
+```
+
+
+### Checking for polynomial contrasts
+
+```{r}
+contrast(VE.VCO2on.emm, "poly", max.degree = 2)
+```
+
+### Marginal Mean Change comparisons
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+
+```{r}
+VE.VCO2on %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+VE.VCO2on %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VE.VCO2onpairs <- pairs(VE.VCO2on.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VE.VCO2onpairs)
+```
+```{r}
+# VE.VCO2on.rg <- ref_grid(VE.VCO2on
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VE.VCO2on.rg)                    
+# VE.VCO2on.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VE.VCO2on.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+# coef(pairs(VE.VCO2on.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VE.VCO2on, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VE.VCO2on, group = "bout",slope = TRUE, id = FALSE)
+```
+## VE.VCO2off Nested data
+
+```{r}
+# avgVE.VCO2off$bout <- as.numeric(avgVE.VCO2off$bout)
+avgVE.VCO2off$bout <- as.factor(avgVE.VCO2off$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
+
+VE.VCO2off <- lmer(avgVE.VCO2~ bout + Gender + Tanner* intensity + (bout|ID) , data = avgVE.VCO2off, REML=TRUE)
+```
+
+Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
+```{r}
+VE.VCO2off.emm <- emmeans(VE.VCO2off, ~ bout |intensity*Gender*Tanner)
+VE.VCO2off.emm
+```
+It might be nice to extract these estimates and plot them:
+
+```{r}
+VE.VCO2off.emm.df <-
+  VE.VCO2off.emm %>%
+  broom::tidy()
+
+VE.VCO2off.emm.df %>%
+  ggplot(aes(bout, estimate, ymin=estimate-std.error, ymax=estimate+std.error, color = Gender, shape = Tanner)) +
+  geom_pointrange() +
+  ylab("Response") 
+```
+
+
+### Checking for polynomial contrasts
+```{r}
+contrast(VE.VCO2off.emm, "poly", max.degree = 2, adjustment = 'tukey')
+```
+
+### Marginal Mean Change comparisons
+
+Let’s see how significant those differences are by analyzing mean changes and consecutive comparisons:
+ 
+```{r}
+VE.VCO2off %>% 
+  emmeans(mean_chg ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Consecutive marginal means comparisons
+Let’s see how significant those differences are by doing consecutive comparisons.
+
+```{r}
+VE.VCO2off %>% 
+  emmeans(consec ~ bout|intensity * Gender * Tanner
+          # , at = list(Gender="MALE",Tanner="Late")
+          ) %>% 
+  pluck("contrasts")
+```
+
+### Pairwise Mean Comparisons
+```{r}
+VE.VCO2offpairs <- pairs(VE.VCO2off.emm, simple = "each", combine = TRUE, reverse = TRUE, adjustment = 'tukey')
+
+# print(VE.VCO2offpairs)
+```
+
+```{r}
+# VE.VCO2off.rg <- ref_grid(VE.VCO2off
+#                     # , nesting = (Gender*Tanner) %in% intensity
+#                     )
+# 
+# str(VE.VCO2off.rg)                    
+# VE.VCO2off.rg
+```
+
+### Graphs with nesting
+```{r}
+plot(VE.VCO2off.emm, PIs = TRUE) + 
+    facet_wrap(~ Gender*Tanner*intensity, nrow = 2, scales = "free_y")
+```
+```{r}
+# Pairwise comparisons are an example of linear functions of EMMs. You may use coef() to see the coefficients of these linear functions:
+
+coef(pairs(VE.VCO2off.emm))
+```
+
+### Interactions with covariates
+When a covariate and a factor interact, we typically don’t want EMMs themselves, but rather estimates of slopes of the covariate trend for each level of the factor.  
+
+To visualize the lines themselves:
+
+```{r}
+emmip(VE.VCO2off, ~ bout | Tanner*Gender*intensity, cov.reduce = range)
+```
+
+### Predictmeans package
+Residuals vs Fitted plots
+```{r}
+library(predictmeans)
+residplot(VE.VCO2off, group = "bout",slope = TRUE, id = FALSE)
+```

@@ -17,34 +17,27 @@ library(dplyr)
 library(plyr)
 ```
 
-# Data preparation
+# Time Constant comparisons
 
-```{r Read in data, message = FALSE, include = FALSE}
-# here::i_am("analysis/Time Constant comparisons v2.Rmd")
-# library(here)
-# 
-# # Get the files names
-# files <-  list.files(path = '/data/',pattern="*.csv")
-# files
-# 
-# readr::read_csv(
-#   here("","*.csv"),
-#   col_types = list(.default = readr::col_guess()),
-# )
-# 
-# # First apply read.csv, then rbind
-# myfiles  <-  do.call(rbind, lapply(files, function(x) read.csv(x, stringsAsFactors = FALSE)))
+This section generates plots of marginal means for the response variable, based on the mixed effects models generated above. 
+
+The plots show the relationship between the response variable and the Time Constant (calculated via optimization in separate code) for each bout in the sequence.
+
+There is a plot for each CPET variable, except Respiratory Quotient, which provided non-useful results in the Time Constant optimization.
+
+The Time constant is considered as the variable 'tau' in the best-fit exponential model in the on- and off-transient bouts.
+
+```{r load libraries 2, include = FALSE}
+# Call the appropriate libraries.
+library(tidyverse)
+library(plotrix)
+library(dplyr)
+library(plyr)
 ```
 
-
-
-```{r}
-#read in the predicted data
-```
-
+## Data preparation
 
 ### Function to compute mean and standard error for each group.
-
 ```{r SummarySE function}
 ## Summarizes data.
 ## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
@@ -98,64 +91,40 @@ library(here)
 
 dat.HRon <- readr::read_csv(
   here("output","dat.HRon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.HRoff <- readr::read_csv(
   here("output","dat.HRoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.RQon <- readr::read_csv(
   here("output","dat.RQon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.RQoff <- readr::read_csv(
   here("output","dat.RQoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.RRon <- readr::read_csv(
   here("output","dat.RRon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.RRoff <- readr::read_csv(
   here("output","dat.RRoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.VCO2on <- readr::read_csv(
   here("output","dat.VCO2kglbmon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.VCO2off <- readr::read_csv(
   here("output","dat.VCO2kglbmoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.VO2off <- readr::read_csv(
   here("output","dat.VO2KGLBMoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.VO2on <- readr::read_csv(
   here("output","dat.VO2KGLBMon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 
 dat.VEoff <- readr::read_csv(
   here("output","dat.VEkglbmoff.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 dat.VEon <- readr::read_csv(
   here("output","dat.VEkglbmon.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 ```
 
@@ -165,48 +134,24 @@ library(here)
 
 HR_on_tau <- readr::read_csv(
   here("data","avg_HR_on.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 HR_off_tau <- readr::read_csv(
   here("data","avg_HR_off.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
-# tau.RQon <- readr::read_csv(
-#   here("data","avg_RQ_on.csv"
-#        # ,
-#   # col_types = list(.default = readr::col_guess())
-# ))
-# tau.RQoff <- readr::read_csv(
-#   here("data","avg_RQ_off.csv"
-#        # ,
-#   # col_types = list(.default = readr::col_guess())
-# ))
 RR_on_tau <- readr::read_csv(
   here("data","avg_RR_on.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 RR_off_tau <- readr::read_csv(
   here("data","avg_RR_off.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 VCO2_on_tau <- readr::read_csv(
   here("data","avg_VCO2_on.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 VCO2_off_tau <- readr::read_csv(
   here("data","avg_VCO2_off.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 VO2_off_tau <- readr::read_csv(
   here("data","avg_VO2_off.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 VO2_on_tau <- readr::read_csv(
   here("data","avg_VO2_on.csv"
@@ -214,17 +159,13 @@ VO2_on_tau <- readr::read_csv(
 
 VE_on_tau <- readr::read_csv(
   here("data","avg_VE_on.csv"
-       # ,
-  # col_types = list(.default = readr::col_guess())
 ))
 VE_off_tau <- readr::read_csv(
   here("data","avg_VE_off.csv"
 ))
-
-
 ```
 
-#VCO2 on
+##VCO2 on
 Rearrange the data into long format, with mean and standard error calculations for each group (GenderxTannerxIntensity).
 ```{r}
 CPET <- "VCO2_on_"
@@ -260,8 +201,6 @@ VCO2_on_tau <- bind_rows(list(bout1, bout2, bout3, bout4, bout5), .id="bout")
 names(VCO2_on_tau)[2] <- "group"
 
 ```
-
-
 
 Combine the dataframes for predicted points (regression model) and Tau values (exponential model).
 
@@ -303,7 +242,7 @@ split.VCO2.on[[8]] -> MALE.late.low
 
 The eight code chunks below generate a separate plot for each subject group.
 
-## Female Early High
+#### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -361,7 +300,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+#### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -418,7 +357,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+#### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -475,7 +414,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+#### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -532,7 +471,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+###Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -589,7 +528,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+#### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -646,7 +585,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+#### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -703,7 +642,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+#### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -760,7 +699,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-#VCO2 off
+##VCO2 off
 ```{r}
 CPET <- "VCO2_off_"
 
@@ -836,7 +775,7 @@ split.VCO2.off[[8]] -> MALE.late.low
 The eight code chunks below generate a separate plot for each subject group.
 
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -893,7 +832,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -950,7 +889,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -1007,7 +946,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -1064,7 +1003,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -1121,7 +1060,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -1178,7 +1117,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -1235,7 +1174,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -1292,7 +1231,7 @@ legend("topleft",legend=c("Predicted Mean VCO2","Time Constant"),
 dev.off()
 ```
 
-#HR on
+##HR on
 Rearrange the data into long format, with mean and standard error calculations for each group (GenderxTannerxIntensity).
 ```{r}
 CPET <- "HR_on_"
@@ -1371,7 +1310,7 @@ split.HR.on[[8]] -> MALE.late.low
 
 The eight code chunks below generate a separate plot for each subject group.
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -1428,7 +1367,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -1485,7 +1424,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -1542,7 +1481,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -1599,7 +1538,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -1655,7 +1594,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -1712,7 +1651,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -1769,7 +1708,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -1826,7 +1765,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-#HR off
+##HR off
 ```{r}
 CPET <- "HR_off_"
 
@@ -1905,7 +1844,7 @@ split.HR.off[[8]] -> MALE.late.low
 The eight code chunks below generate a separate plot for each subject group.
 
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -1962,7 +1901,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -2019,7 +1958,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -2076,7 +2015,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -2133,7 +2072,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -2190,7 +2129,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -2247,7 +2186,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -2304,7 +2243,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -2361,7 +2300,7 @@ legend("topleft",legend=c("Predicted Mean HR","Time Constant"),
 dev.off()
 ```
 
-#RR on
+##RR on
 Rearrange the data into long format, with mean and standard error calculations for each group (GenderxTannerxIntensity).
 ```{r}
 CPET <- "RR_on_"
@@ -2437,7 +2376,7 @@ split.RR.on[[8]] -> MALE.late.low
 
 The eight code chunks below generate a separate plot for each subject group.
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -2494,7 +2433,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -2551,7 +2490,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -2608,7 +2547,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -2665,7 +2604,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -2722,7 +2661,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -2779,7 +2718,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -2836,7 +2775,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -2893,7 +2832,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-#RR off
+##RR off
 ```{r}
 CPET <- "RR_off_"
 
@@ -2968,7 +2907,7 @@ split.RR.off[[8]] -> MALE.late.low
 The eight code chunks below generate a separate plot for each subject group.
 
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -3025,7 +2964,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -3082,7 +3021,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -3139,7 +3078,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -3196,7 +3135,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -3253,7 +3192,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -3310,7 +3249,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 # Set the min and max values for the x- and y-axes in our plots.
 grouping <- "MLL"
@@ -3368,7 +3307,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -3425,7 +3364,7 @@ legend("topleft",legend=c("Predicted Mean RR","Time Constant"),
 dev.off()
 ```
 
-#VE on
+##VE on
 Rearrange the data into long format, with mean and standard error calculations for each group (GenderxTannerxIntensity).
 ```{r}
 CPET <- "VE_on_"
@@ -3500,7 +3439,7 @@ split.VE.on[[8]] -> MALE.late.low
 
 The eight code chunks below generate a separate plot for each subject group.
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -3557,7 +3496,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -3614,7 +3553,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -3671,7 +3610,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -3728,7 +3667,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -3785,7 +3724,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -3842,7 +3781,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -3899,7 +3838,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -3956,7 +3895,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-#VE off
+##VE off
 ```{r}
 CPET <- "VE_off_"
 
@@ -4031,7 +3970,7 @@ split.VE.off[[8]] -> MALE.late.low
 The eight code chunks below generate a separate plot for each subject group.
 
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -4088,7 +4027,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -4145,7 +4084,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -4202,7 +4141,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -4259,7 +4198,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -4316,7 +4255,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -4373,7 +4312,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -4430,7 +4369,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -4487,7 +4426,7 @@ legend("topleft",legend=c("Predicted Mean VE","Time Constant"),
 dev.off()
 ```
 
-#VO2 on
+##VO2 on
 Rearrange the data into long format, with mean and standard error calculations for each group (GenderxTannerxIntensity).
 ```{r}
 CPET <- "VO2_on_"
@@ -4562,7 +4501,7 @@ split.VO2.on[[8]] -> MALE.late.low
 
 The eight code chunks below generate a separate plot for each subject group.
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -4619,7 +4558,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -4676,7 +4615,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -4733,7 +4672,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -4790,7 +4729,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -4847,7 +4786,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -4904,7 +4843,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -4961,7 +4900,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
@@ -5018,7 +4957,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-#VO2 off
+##VO2 off
 ```{r}
 CPET <- "VO2_off_"
 
@@ -5093,7 +5032,7 @@ split.VO2.off[[8]] -> MALE.late.low
 The eight code chunks below generate a separate plot for each subject group.
 
 
-## Female Early High
+### Female Early High
 ```{r}
 grouping <- "FEH"
 
@@ -5150,7 +5089,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Early Low
+### Female Early Low
 ```{r}
 grouping <- "FEL"
 
@@ -5207,7 +5146,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late Low
+### Female Late Low
 ```{r}
 grouping <- "FLL"
 
@@ -5264,7 +5203,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Female Late High
+### Female Late High
 ```{r}
 grouping <- "FLH"
 
@@ -5321,7 +5260,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early High
+### Male Early High
 ```{r}
 grouping <- "MEH"
 
@@ -5378,7 +5317,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Early Low
+### Male Early Low
 ```{r}
 grouping <- "MEL"
 
@@ -5435,7 +5374,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late Low
+### Male Late Low
 ```{r}
 grouping <- "MLL"
 
@@ -5492,7 +5431,7 @@ legend("topleft",legend=c("Predicted Mean VO2","Time Constant"),
 dev.off()
 ```
 
-## Male Late High
+### Male Late High
 ```{r}
 grouping <- "MLH"
 
