@@ -1236,6 +1236,7 @@ Residuals vs Fitted plots
 library(predictmeans)
 residplot(VEoff, group = "bout",slope = TRUE, id = FALSE)
 ```
+
 ## RRon Nested data
 
 For our post-hoc comparisons, we ensure that 'bout' is modeled as a factor which will enable mean comparisons between levels of 'bout'.
@@ -1265,9 +1266,7 @@ RRon.emm.df %>%
   ylab("Response")
 ```
 
-
 ### Checking for polynomial contrasts
-
 ```{r}
 contrast(RRon.emm, "poly", max.degree = 2)
 ```
@@ -1342,7 +1341,7 @@ residplot(RRon, group = "bout",slope = TRUE, id = FALSE)
 # avgRRoff$bout <- as.numeric(avgRRoff$bout)
 avgRRoff$bout <- as.factor(avgRRoff$bout) # for post-hoc analysis, we code the 'bout' parameter as a factor with 6 levels (for on-transient bouts) and 5 levels (for off-transient bouts).
 
-RRoff <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
+RRoff <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=TRUE)
 ```
 
 Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
@@ -1363,9 +1362,7 @@ RRoff.emm.df %>%
   ylab("Response") 
 ```
 
-
 ### Checking for polynomial contrasts
-
 ```{r}
 contrast(RRoff.emm, "poly", max.degree = 2, adjustment = 'tukey')
 ```
@@ -1463,9 +1460,7 @@ VE.VCO2on.emm.df %>%
   ylab("Response")
 ```
 
-
 ### Checking for polynomial contrasts
-
 ```{r}
 contrast(VE.VCO2on.emm, "poly", max.degree = 2)
 ```
@@ -1560,7 +1555,6 @@ VE.VCO2off.emm.df %>%
   geom_pointrange() +
   ylab("Response") 
 ```
-
 
 ### Checking for polynomial contrasts
 ```{r}

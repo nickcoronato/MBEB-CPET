@@ -104,7 +104,6 @@ head(all_GK_bybout,6)
 Create a 'demographics' table for later use, which contains the listing of IDs used in the models.
 ```{r create demographics}
 demographics <- distinct(all_GK_bybout, ID, .keep_all=TRUE)[,1:6]
-
 ```
 
 ## Convert the 'bout' variable to discrete numeric values. For the off-transient bouts (recovery periods), subtract 1.5 in order to center the variable at 0 for further analysis.
@@ -223,7 +222,6 @@ summ(m1B)
 # ranef(m1B)
 HRon <- m1B
 ```
-
 
 ### Comparing On transient models
 ```{r compare HRon}
@@ -1310,7 +1308,7 @@ summ(m2)
 ### Model 2B: Some interactions
 ```{r}
 m2B <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
-# summary(m2B)
+summary(m2B)
 summ(m2B)
 # coef(m2B)
 # # fixef(m2B)
@@ -1487,14 +1485,6 @@ When type = "random", the predicted values are still on the population-level. Ho
 The random-effect variance is the mean random-effect variance. Calculation is based on the proposal from Johnson et al. 2014, which is also implemented in functions like performance::r2() or insight::get_variance() to get r-squared values or random effect variances for mixed models with more complex random effects structures.
 
 As can be seen, compared to the previous example with type = "fixed", predicted values are identical (both on the population-level). However, standard errors, and thus the resulting confidence (or prediction) intervals are much larger .
-
-```{r}
-#just Heart Rate on first
-pr <- ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender","intensity","Tanner"), type = "random")
-pr
-plot(pr,ci.style = "ribbon",add.data = TRUE, residuals = FALSE, residuals.line = FALSE, dot.alpha = 0.3, dot.size = 1.6, jitter = 0.05, collapse.group = "intensity") + scale_x_continuous(breaks = c(1,2,3,4,5), limits = c(1,5))
-
-```
 
 ```{r}
 # Another way to do this is with plot_model:  
@@ -1686,88 +1676,105 @@ tab_model(VE.VCO2models, show.reflvl = F, auto.label=TRUE
           )
 ```
 
+# Residuals analysis
+Three plots can be generated:
 
+1. A histogram of the residuals for each model against its original data.
 
-# residuals analysis
-Generate a histogram of the residuals for each model against its original data.
+2. Distribution of the residuals for the random effect of ‘bout’ in the model. Measure of the conditional variance.
+
+3. A scatterplot of the residuals. Indicates normal distribution.
+
 ```{r}
 HRonresiduals <- resid(HRon)
-summary(HRonresiduals)
-hist(HRonresiduals)
-print(dotplot(ranef(HRon,condVar=TRUE)))
-plot(HRon)
+summary(HRonresiduals) #a summary of the residuals for this model
+hist(HRonresiduals) # a histogram of the residuals distribution
+print(dotplot(ranef(HRon,condVar=TRUE))) # a dotplot of the random effects residuals
+plot(HRon) # a scatter plot of the residuals
 ```
 ```{r}
 HRoffresiduals <- resid(HRoff)
 summary(HRoffresiduals)
 hist(HRoffresiduals)
 print(dotplot(ranef(HRoff,condVar=TRUE)))
+plot(HRoff)
 ```
 ```{r}
 VO2KGLBMonresiduals <- resid(VO2KGLBMon)
 summary(VO2KGLBMonresiduals)
 hist(VO2KGLBMonresiduals)
 print(dotplot(ranef(VO2KGLBMon,condVar=TRUE)))
+plot(VO2KGLBMon)
 ```
 ```{r}
 VO2KGLBMoffresiduals <- resid(VO2KGLBMoff)
 summary(VO2KGLBMoffresiduals)
 hist(VO2KGLBMoffresiduals)
 print(dotplot(ranef(VO2KGLBMoff,condVar=TRUE)))
+plot(VO2KGLBMoff)
 ```
 ```{r}
 VCO2kglbmonresiduals <- resid(VCO2kglbmon)
 summary(VCO2kglbmonresiduals)
 hist(VCO2kglbmonresiduals)
 print(dotplot(ranef(VCO2kglbmon,condVar=TRUE)))
+plot(VCO2kglbmon)
 ```
 ```{r}
 VCO2kglbmoffresiduals <- resid(VCO2kglbmoff)
 summary(VCO2kglbmoffresiduals)
 hist(VCO2kglbmoffresiduals)
 print(dotplot(ranef(VCO2kglbmoff,condVar=TRUE)))
+plot(VCO2kglbmoff)
 ```
 ```{r}
 VEkglbmonresiduals <- resid(VEkglbmon)
 summary(VEkglbmonresiduals)
 hist(VEkglbmonresiduals)
 print(dotplot(ranef(VEkglbmon,condVar=TRUE)))
+plot(VEkglbmon)
 ```
 ```{r}
 VEkglbmoffresiduals <- resid(VEkglbmoff)
 summary(VEkglbmoffresiduals)
 hist(VEkglbmoffresiduals)
 print(dotplot(ranef(VEkglbmoff,condVar=TRUE)))
+plot(VEkglbmoff)
 ```
 ```{r}
 RQonresiduals <- resid(RQon)
 summary(RQonresiduals)
 hist(RQonresiduals)
 print(dotplot(ranef(RQon,condVar=TRUE)))
+plot(RQon)
 ```
 ```{r}
 RQoffresiduals <- resid(RQoff)
 summary(RQoffresiduals)
 hist(RQoffresiduals)
 print(dotplot(ranef(RQoff,condVar=TRUE)))
+plot(RQoff)
 ```
 ```{r}
 RRonresiduals <- resid(RRon)
 summary(RRonresiduals)
 hist(RRonresiduals)
 print(dotplot(ranef(RRon,condVar=TRUE)))
+plot(RRon)
 ```
 ```{r}
 RRoffresiduals <- resid(RRoff)
 summary(RRoffresiduals)
 hist(RRoffresiduals)
 print(dotplot(ranef(RRoff,condVar=TRUE)))
+plot(RRoff)
 ```
 ```{r}
 VE.VCO2onresiduals <- resid(VE.VCO2on)
 summary(VE.VCO2onresiduals)
 hist(VE.VCO2onresiduals)
 print(dotplot(ranef(VE.VCO2on,condVar=TRUE)))
+plot(VE.VCO2on)
 ```
 ```{r}
 VE.VCO2offresiduals <- resid(VE.VCO2off)
@@ -1775,4 +1782,5 @@ plot(resid(VE.VCO2off))
 summary(VE.VCO2offresiduals)
 hist(VE.VCO2offresiduals)
 print(dotplot(ranef(VE.VCO2off,condVar=TRUE)))
+plot(VE.VCO2off)
 ```
