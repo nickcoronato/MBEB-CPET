@@ -426,7 +426,7 @@ div.tocify {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-07-27
+<strong>Last updated:</strong> 2021-07-28
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
@@ -845,16 +845,16 @@ output/VE.VCO2models.html
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree8b034ab748745d55d2d456f69df9df8efac7cdc2targetblank8b034aba"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/8b034ab748745d55d2d456f69df9df8efac7cdc2" target="_blank">8b034ab</a> </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree87efcc28207a57901e961ef619b2194db8984d47targetblank87efcc2a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/87efcc28207a57901e961ef619b2194db8984d47" target="_blank">87efcc2</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree8b034ab748745d55d2d456f69df9df8efac7cdc2targetblank8b034aba" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree87efcc28207a57901e961ef619b2194db8984d47targetblank87efcc2a" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/8b034ab748745d55d2d456f69df9df8efac7cdc2" target="_blank">8b034ab</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/87efcc28207a57901e961ef619b2194db8984d47" target="_blank">87efcc2</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -961,6 +961,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/nickcoronato/MBEB-CPET/blob/87efcc28207a57901e961ef619b2194db8984d47/analysis/MixedEffectsCPETmodels.Rmd" target="_blank">87efcc2</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-28
+</td>
+<td>
+Updated code for all three analysis files.
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/nickcoronato/MBEB-CPET/263b9776267056b3616c72247f94d4c54c935749/docs/MixedEffectsCPETmodels.html" target="_blank">263b977</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-28
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -20941,8 +20975,53 @@ ID
 <div id="model-2b-some-interactions-7" class="section level3">
 <h3>Model 2B: Some interactions</h3>
 <pre class="r"><code>m2B &lt;- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)</code></pre>
+summary(m2B)</code></pre>
+<pre><code>Linear mixed model fit by maximum likelihood . t-tests use Satterthwaite&#39;s
+  method [lmerModLmerTest]
+Formula: avgRR ~ bout * intensity + Gender * Tanner * bout + (bout | ID)
+   Data: avgRRoff
+
+     AIC      BIC   logLik deviance df.resid 
+  5470.7   5538.8  -2721.3   5442.7      945 
+
+Scaled residuals: 
+    Min      1Q  Median      3Q     Max 
+-2.9434 -0.5686 -0.0489  0.5253  5.5232 
+
+Random effects:
+ Groups   Name        Variance Std.Dev. Corr
+ ID       (Intercept)  8.1927  2.8623       
+          bout         0.1348  0.3671   0.27
+ Residual             13.7992  3.7147       
+Number of obs: 959, groups:  ID, 81
+
+Fixed effects:
+                           Estimate Std. Error       df t value Pr(&gt;|t|)    
+(Intercept)                 31.6122     0.8609  92.0076  36.719  &lt; 2e-16 ***
+bout                         1.3766     0.1918 109.6251   7.176 8.99e-11 ***
+intensitylow                -6.2789     0.4235 799.8314 -14.825  &lt; 2e-16 ***
+GenderMALE                   3.5011     1.1341  80.9901   3.087 0.002767 ** 
+TannerLate                   0.3824     1.0812  81.1467   0.354 0.724536    
+bout:intensitylow           -1.2699     0.1414 805.9735  -8.984  &lt; 2e-16 ***
+GenderMALE:TannerLate       -5.2837     1.5434  81.0685  -3.423 0.000972 ***
+bout:GenderMALE             -0.3891     0.2409  80.6148  -1.615 0.110186    
+bout:TannerLate              0.4720     0.2312  82.4142   2.042 0.044334 *  
+bout:GenderMALE:TannerLate   0.6795     0.3293  81.8827   2.064 0.042228 *  
+---
+Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+
+Correlation of Fixed Effects:
+            (Intr) bout   intnst GnMALE TnnrLt bt:ntn GMALE: bt:GMALE bt:TnL
+bout        -0.328                                                          
+intensitylw -0.247  0.306                                                   
+GenderMALE  -0.713  0.192  0.001                                            
+TannerLate  -0.747  0.200  0.000  0.567                                     
+bt:ntnstylw  0.204 -0.376 -0.823 -0.001  0.002                              
+GndrMALE:TL  0.524 -0.141 -0.001 -0.735 -0.701  0.001                       
+bt:GndrMALE  0.201 -0.686 -0.002 -0.281 -0.160  0.006  0.206                
+bout:TnnrLt  0.209 -0.710  0.003 -0.159 -0.282 -0.007  0.198  0.567         
+bt:GMALE:TL -0.147  0.501  0.001  0.205  0.198 -0.002 -0.282 -0.732   -0.702</code></pre>
+<pre class="r"><code>summ(m2B)</code></pre>
 <table class="table table-striped table-hover table-condensed table-responsive" style="width: auto !important; margin-left: auto; margin-right: auto;">
 <tbody>
 <tr>
@@ -23925,119 +24004,18 @@ write.csv(VE.VCO2offcoefs,&quot;~/R/MBEB-CPET/output/VE.VCO2offcoefs.csv&quot;, 
 <p>When type = “random”, the predicted values are still on the population-level. However, the random effect variances are taken into account, meaning that the intervals are actually prediction intervals and become larger. More technically speaking, type = “random” accounts for the uncertainty of the fixed effects conditional on the estimates of the random-effect variances and conditional modes (BLUPs).</p>
 <p>The random-effect variance is the mean random-effect variance. Calculation is based on the proposal from Johnson et al. 2014, which is also implemented in functions like performance::r2() or insight::get_variance() to get r-squared values or random effect variances for mixed models with more complex random effects structures.</p>
 <p>As can be seen, compared to the previous example with type = “fixed”, predicted values are identical (both on the population-level). However, standard errors, and thus the resulting confidence (or prediction) intervals are much larger .</p>
-<pre class="r"><code>#just Heart Rate on first
-pr &lt;- ggpredict(HRon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;,&quot;intensity&quot;,&quot;Tanner&quot;), type = &quot;random&quot;)
-pr</code></pre>
-<pre><code># Predicted values of avgHR
-
-#    Gender = FEMALE
-# intensity = high
-#    Tanner = Early
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    148.41 | [126.58, 170.24]
-   2 |    157.32 | [135.51, 179.14]
-   3 |    166.24 | [144.41, 188.07]
-   5 |    184.06 | [162.09, 206.04]
-
-#    Gender = MALE
-# intensity = high
-#    Tanner = Early
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    149.21 | [127.41, 171.01]
-   2 |    158.12 | [136.34, 179.91]
-   3 |    167.04 | [145.23, 188.84]
-   5 |    184.86 | [162.91, 206.82]
-
-#    Gender = FEMALE
-# intensity = low
-#    Tanner = Early
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    124.91 | [103.08, 146.73]
-   2 |    128.46 | [106.65, 150.27]
-   3 |    132.01 | [110.18, 153.84]
-   5 |    139.12 | [117.15, 161.10]
-
-#    Gender = MALE
-# intensity = low
-#    Tanner = Early
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    125.71 | [103.91, 147.50]
-   2 |    129.26 | [107.48, 151.04]
-   3 |    132.81 | [111.01, 154.62]
-   5 |    139.92 | [117.98, 161.87]
-
-#    Gender = FEMALE
-# intensity = high
-#    Tanner = Late
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    147.11 | [125.35, 168.87]
-   2 |    158.67 | [136.92, 180.42]
-   3 |    170.23 | [148.47, 192.00]
-   5 |    193.36 | [171.47, 215.25]
-
-#    Gender = MALE
-# intensity = high
-#    Tanner = Late
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    147.91 | [126.11, 169.71]
-   2 |    159.47 | [137.68, 181.26]
-   3 |    171.03 | [149.23, 192.84]
-   5 |    194.16 | [172.23, 216.09]
-
-#    Gender = FEMALE
-# intensity = low
-#    Tanner = Late
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    121.62 | [ 99.86, 143.38]
-   2 |    126.15 | [104.41, 147.90]
-   3 |    130.69 | [108.93, 152.45]
-   5 |    139.76 | [117.88, 161.64]
-
-#    Gender = MALE
-# intensity = low
-#    Tanner = Late
-
-bout | Predicted |           95% CI
------------------------------------
-   1 |    122.42 | [100.62, 144.22]
-   2 |    126.95 | [105.17, 148.74]
-   3 |    131.49 | [109.68, 153.29]
-   5 |    140.56 | [118.63, 162.48]
-
-Adjusted for:
-* ID = 0 (population-level)</code></pre>
-<pre><code>
-Intervals are prediction intervals.</code></pre>
-<pre class="r"><code>plot(pr,ci.style = &quot;ribbon&quot;,add.data = TRUE, residuals = FALSE, residuals.line = FALSE, dot.alpha = 0.3, dot.size = 1.6, jitter = 0.05, collapse.group = &quot;intensity&quot;) + scale_x_continuous(breaks = c(1,2,3,4,5), limits = c(1,5))</code></pre>
-<pre><code>Warning: Collapsing usually not informative across a continuous variable.</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-1.png" width="672" style="display: block; margin: auto;" /></p>
-<pre><code>NULL</code></pre>
 <pre class="r"><code># Another way to do this is with plot_model:  
 # plot_model(HRon, type = &quot;pred&quot;, terms = c(&quot;bout[1,2,3,4,5]&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 
 dat.HRon &lt;- ggpredict(HRon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;,&quot;Tanner&quot;,&quot;intensity&quot;), type = &quot;random&quot;)
 plot(dat.HRon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>write.csv(dat.HRon,&quot;~/R/MBEB-CPET/output/dat.HRon.csv&quot;, row.names = FALSE)
 
 dat.HRoff &lt;- ggpredict(HRoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.HRoff,&quot;~/R/MBEB-CPET/output/dat.HRoff.csv&quot;, row.names = FALSE)
 plot(dat.HRoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-2.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VO2KGon &lt;- ggpredict(VO2KGon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VO2KGon,&quot;~/R/MBEB-CPET/output/dat.VO2KGon.csv&quot;, row.names = FALSE)
 dat.VO2KGon</code></pre>
@@ -24134,71 +24112,71 @@ bout | Predicted |         95% CI
 Adjusted for:
 * ID = 0 (population-level)</code></pre>
 <pre class="r"><code>plot(dat.VO2KGon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-3.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VO2KGoff &lt;- ggpredict(VO2KGoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VO2KGoff,&quot;~/R/MBEB-CPET/output/dat.VO2KGoff.csv&quot;, row.names = FALSE)
 plot(dat.VO2KGoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-4.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-4.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VO2KGLBMon &lt;- ggpredict(VO2KGLBMon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VO2KGLBMon,&quot;~/R/MBEB-CPET/output/dat.VO2KGLBMon.csv&quot;, row.names = FALSE)
 plot(dat.VO2KGLBMon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-5.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-5.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VO2KGLBMoff &lt;- ggpredict(VO2KGLBMoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VO2KGLBMoff,&quot;~/R/MBEB-CPET/output/dat.VO2KGLBMoff.csv&quot;, row.names = FALSE)
 plot(dat.VO2KGLBMoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-6.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-6.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VCO2on &lt;- ggpredict(VCO2on, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VCO2on,&quot;~/R/MBEB-CPET/output/dat.VCO2on.csv&quot;, row.names = FALSE)
 plot(dat.VCO2on, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-7.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-7.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VCO2off &lt;- ggpredict(VCO2off, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VCO2off,&quot;~/R/MBEB-CPET/output/dat.VCO2off.csv&quot;, row.names = FALSE)
 plot(dat.VCO2off, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-8.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-8.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VCO2kglbmon &lt;- ggpredict(VCO2kglbmon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VCO2kglbmon,&quot;~/R/MBEB-CPET/output/dat.VCO2kglbmon.csv&quot;, row.names = FALSE)
 plot(dat.VCO2kglbmon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-9.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-9.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VCO2kglbmoff &lt;- ggpredict(VCO2kglbmoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VCO2kglbmoff,&quot;~/R/MBEB-CPET/output/dat.VCO2kglbmoff.csv&quot;, row.names = FALSE)
 plot(dat.VCO2kglbmoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-10.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-10.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.RQon &lt;- ggpredict(RQon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.RQon,&quot;~/R/MBEB-CPET/output/dat.RQon.csv&quot;, row.names = FALSE)
 plot(dat.RQon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-11.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-11.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.RQoff &lt;- ggpredict(RQoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.RQoff,&quot;~/R/MBEB-CPET/output/dat.RQoff.csv&quot;, row.names = FALSE)
 plot(dat.RQoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-12.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-12.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VEkglbmon &lt;- ggpredict(VEkglbmon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VEkglbmon,&quot;~/R/MBEB-CPET/output/dat.VEkglbmon.csv&quot;, row.names = FALSE)
 plot(dat.VEkglbmon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-13.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-13.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VEkglbmon &lt;- ggpredict(VEkglbmon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VEkglbmon,&quot;~/R/MBEB-CPET/output/dat.VEkglbmon.csv&quot;, row.names = FALSE)
 plot(dat.VEkglbmon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-14.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-14.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VEkglbmoff &lt;- ggpredict(VEkglbmoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VEkglbmoff,&quot;~/R/MBEB-CPET/output/dat.VEkglbmoff.csv&quot;, row.names = FALSE)
 plot(dat.VEkglbmoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-15.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-15.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.RRon &lt;- ggpredict(RRon, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.RRon,&quot;~/R/MBEB-CPET/output/dat.RRon.csv&quot;, row.names = FALSE)
 plot(dat.RRon, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-16.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-16.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.RRoff &lt;- ggpredict(RRoff, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.RRoff,&quot;~/R/MBEB-CPET/output/dat.RRoff.csv&quot;, row.names = FALSE)
 plot(dat.RRoff, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-17.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-17.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VE.VCO2on &lt;- ggpredict(VE.VCO2on, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VE.VCO2on,&quot;~/R/MBEB-CPET/output/dat.VE.VCO2on.csv&quot;, row.names = FALSE)
 plot(dat.VE.VCO2on, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-18.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-18.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>dat.VE.VCO2off &lt;- ggpredict(VE.VCO2off, terms = c(&quot;bout[1,2,3,4,5]&quot;,&quot;Gender&quot;, &quot;Tanner&quot;, &quot;intensity&quot;))
 write.csv(dat.VE.VCO2off,&quot;~/R/MBEB-CPET/output/dat.VE.VCO2off.csv&quot;, row.names = FALSE)
 plot(dat.VE.VCO2off, ci.style = &quot;dot&quot;, add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = &quot;intensity&quot;)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-36-19.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-35-19.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code># Currently not used for this analysis.
 
 # plot_summs(VCO2on, VCO2off, scale = TRUE, 
@@ -28901,138 +28879,169 @@ Marginal R<sup>2</sup> / Conditional R<sup>2</sup>
 </div>
 </div>
 <div id="residuals-analysis" class="section level1">
-<h1>residuals analysis</h1>
-<p>Generate a histogram of the residuals for each model against its original data.</p>
+<h1>Residuals analysis</h1>
+<p>Three plots can be generated:</p>
+<ol style="list-style-type: decimal">
+<li><p>A histogram of the residuals for each model against its original data.</p></li>
+<li><p>Distribution of the residuals for the random effect of ‘bout’ in the model. Measure of the conditional variance.</p></li>
+<li><p>A scatterplot of the residuals. Indicates normal distribution.</p></li>
+</ol>
 <pre class="r"><code>HRonresiduals &lt;- resid(HRon)
-summary(HRonresiduals)</code></pre>
+summary(HRonresiduals) #a summary of the residuals for this model</code></pre>
 <pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 -48.399  -6.190   0.969   0.000   7.415  34.008 </code></pre>
-<pre class="r"><code>hist(HRonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-1.png" width="672" style="display: block; margin: auto;" /></p>
-<pre class="r"><code>print(dotplot(ranef(HRon,condVar=TRUE)))</code></pre>
+<pre class="r"><code>hist(HRonresiduals) # a histogram of the residuals distribution</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-38-1.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>print(dotplot(ranef(HRon,condVar=TRUE))) # a dotplot of the random effects residuals</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-2.png" width="672" style="display: block; margin: auto;" /></p>
-<pre class="r"><code>plot(HRon)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-3.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-38-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(HRon) # a scatter plot of the residuals</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-38-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>HRoffresiduals &lt;- resid(HRoff)
 summary(HRoffresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -34.1990  -5.6993   0.1889   0.0000   6.0380  30.6439 </code></pre>
 <pre class="r"><code>hist(HRoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-40-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(HRoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-40-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(HRoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-39-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VO2KGLBMonresiduals &lt;- resid(VO2KGLBMon)
 summary(VO2KGLBMonresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -19.2854  -2.9196   0.4311   0.0000   3.1953  20.6175 </code></pre>
 <pre class="r"><code>hist(VO2KGLBMonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-41-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-40-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VO2KGLBMon,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-41-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-40-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VO2KGLBMon)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-40-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VO2KGLBMoffresiduals &lt;- resid(VO2KGLBMoff)
 summary(VO2KGLBMoffresiduals)</code></pre>
 <pre><code>     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 -10.84673  -1.33685  -0.01674   0.00000   1.17328  27.60848 </code></pre>
 <pre class="r"><code>hist(VO2KGLBMoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-42-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-41-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VO2KGLBMoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-42-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-41-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VO2KGLBMoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-41-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VCO2kglbmonresiduals &lt;- resid(VCO2kglbmon)
 summary(VCO2kglbmonresiduals)</code></pre>
 <pre><code>      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 -0.0347873 -0.0046150  0.0009613  0.0000000  0.0054927  0.0424697 </code></pre>
 <pre class="r"><code>hist(VCO2kglbmonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-43-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-42-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VCO2kglbmon,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-43-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-42-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VCO2kglbmon)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-42-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VCO2kglbmoffresiduals &lt;- resid(VCO2kglbmoff)
 summary(VCO2kglbmoffresiduals)</code></pre>
 <pre><code>      Min.    1st Qu.     Median       Mean    3rd Qu.       Max. 
 -2.178e-02 -2.336e-03  5.361e-05  0.000e+00  2.093e-03  2.862e-02 </code></pre>
 <pre class="r"><code>hist(VCO2kglbmoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-44-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-43-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VCO2kglbmoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-44-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-43-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VCO2kglbmoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-43-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VEkglbmonresiduals &lt;- resid(VEkglbmon)
 summary(VEkglbmonresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -1.09122 -0.14063  0.03335  0.00000  0.17835  1.09225 </code></pre>
 <pre class="r"><code>hist(VEkglbmonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-45-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-44-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VEkglbmon,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-45-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-44-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VEkglbmon)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-44-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VEkglbmoffresiduals &lt;- resid(VEkglbmoff)
 summary(VEkglbmoffresiduals)</code></pre>
 <pre><code>     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 -0.501670 -0.084327 -0.006038  0.000000  0.079568  0.842376 </code></pre>
 <pre class="r"><code>hist(VEkglbmoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-46-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-45-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VEkglbmoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-46-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-45-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VEkglbmoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-45-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>RQonresiduals &lt;- resid(RQon)
 summary(RQonresiduals)</code></pre>
 <pre><code>     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 -0.331848 -0.037765 -0.001197  0.000000  0.039510  0.760666 </code></pre>
 <pre class="r"><code>hist(RQonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-47-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-46-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(RQon,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-47-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-46-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(RQon)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-46-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>RQoffresiduals &lt;- resid(RQoff)
 summary(RQoffresiduals)</code></pre>
 <pre><code>     Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 -0.257779 -0.044835 -0.001039  0.000000  0.042692  0.349502 </code></pre>
 <pre class="r"><code>hist(RQoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-48-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-47-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(RQoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-48-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-47-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(RQoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-47-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>RRonresiduals &lt;- resid(RRon)
 summary(RRonresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -15.5446  -2.6274  -0.0545   0.0000   2.5523  18.5325 </code></pre>
 <pre class="r"><code>hist(RRonresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-49-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-48-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(RRon,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-49-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-48-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(RRon)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-48-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>RRoffresiduals &lt;- resid(RRoff)
 summary(RRoffresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -10.9337  -2.1120  -0.1815   0.0000   1.9515  20.5171 </code></pre>
 <pre class="r"><code>hist(RRoffresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-50-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-49-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(RRoff,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-50-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-49-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(RRoff)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-49-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VE.VCO2onresiduals &lt;- resid(VE.VCO2on)
 summary(VE.VCO2onresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -10.7312  -1.6914  -0.3939   0.0000   1.1612  41.1154 </code></pre>
 <pre class="r"><code>hist(VE.VCO2onresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-50-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VE.VCO2on,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-50-2.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VE.VCO2on)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-50-3.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>VE.VCO2offresiduals &lt;- resid(VE.VCO2off)
 plot(resid(VE.VCO2off))</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-52-1.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-1.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>summary(VE.VCO2offresiduals)</code></pre>
 <pre><code>    Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
 -15.4737  -1.5587  -0.2439   0.0000   1.0939  77.3080 </code></pre>
 <pre class="r"><code>hist(VE.VCO2offresiduals)</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-52-2.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-2.png" width="672" style="display: block; margin: auto;" /></p>
 <pre class="r"><code>print(dotplot(ranef(VE.VCO2off,condVar=TRUE)))</code></pre>
 <pre><code>$ID</code></pre>
-<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-52-3.png" width="672" style="display: block; margin: auto;" /></p>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-3.png" width="672" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>plot(VE.VCO2off)</code></pre>
+<p><img src="figure/MixedEffectsCPETmodels.Rmd/unnamed-chunk-51-4.png" width="672" style="display: block; margin: auto;" /></p>
 <br>
 <p>
 <button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
@@ -29104,7 +29113,7 @@ loaded via a namespace (and not attached):
  [94] Formula_1.2-4          libcoin_1.0-8          lubridate_1.7.10      
  [97] DBI_1.1.0              sjlabelled_1.1.7       ppcor_1.1             
 [100] dbplyr_2.1.1           see_0.6.4              data.tree_1.0.0       
-[103] mitools_2.4            cli_2.5.0              parallel_4.0.3        
+[103] mitools_2.4            cli_3.0.1              parallel_4.0.3        
 [106] insight_0.14.1         dotCall64_1.0-1        pkgconfig_2.0.3       
 [109] numDeriv_2016.8-1.1    coin_1.4-1             foreign_0.8-80        
 [112] xml2_1.3.2             svglite_2.0.0          webshot_0.5.2         
