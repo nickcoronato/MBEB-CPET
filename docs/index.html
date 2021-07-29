@@ -377,16 +377,16 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtreee8ba65c7e8d640ed3751f21f4f1cec33ac4838d8targetblanke8ba65ca"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/e8ba65c7e8d640ed3751f21f4f1cec33ac4838d8" target="_blank">e8ba65c</a> </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree981c78cd145b2a5b4cf05c3d76e4ebff7ff92910targetblank981c78ca"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/981c78cd145b2a5b4cf05c3d76e4ebff7ff92910" target="_blank">981c78c</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtreee8ba65c7e8d640ed3751f21f4f1cec33ac4838d8targetblanke8ba65ca" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree981c78cd145b2a5b4cf05c3d76e4ebff7ff92910targetblank981c78ca" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/e8ba65c7e8d640ed3751f21f4f1cec33ac4838d8" target="_blank">e8ba65c</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/981c78cd145b2a5b4cf05c3d76e4ebff7ff92910" target="_blank">981c78c</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -498,6 +498,40 @@ Message
 Rmd
 </td>
 <td>
+<a href="https://github.com/nickcoronato/MBEB-CPET/blob/981c78cd145b2a5b4cf05c3d76e4ebff7ff92910/analysis/index.Rmd" target="_blank">981c78c</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-29
+</td>
+<td>
+update index.Rmd.
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/nickcoronato/MBEB-CPET/66a9b32457e24ec9dab3b3504fa3f291f3026438/docs/index.html" target="_blank">66a9b32</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-29
+</td>
+<td>
+Build site.
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
 <a href="https://github.com/nickcoronato/MBEB-CPET/blob/e8ba65c7e8d640ed3751f21f4f1cec33ac4838d8/analysis/index.Rmd" target="_blank">e8ba65c</a>
 </td>
 <td>
@@ -551,16 +585,19 @@ Start workflowr project.
 </div>
 </div>
 </div>
-<p>#Background We propose that multilevel regression modeling (MLM) of mixed effects is a highly suitable approach for this class of analytical problems. According to Hox’s textbook on the subject, “multilevel models are designed to analyze variables from different levels simultaneously, using a statistical model that properly includes the various dependencies.” The MBEB data set used in this study can certainly be viewed as hierarchical; three explanatory variables (gender, maturational status, and consecutive bout number) exist at all levels of exercise intensity, and one single outcome variable (a physiological response) is measured repeatedly for each subject. Initial analysis revealed high levels of intra-class correlation, with clustering of individuals within puberty and gender groups and variables measured at two separate exercise intensities (treatments). Cross-level investigations were required to address our research hypotheses.</p>
+<div id="background" class="section level1">
+<h1>Background</h1>
+<p>We propose that multilevel regression modeling (MLM) of mixed effects is a highly suitable approach for this class of analytical problems. According to Hox’s textbook on the subject, “multilevel models are designed to analyze variables from different levels simultaneously, using a statistical model that properly includes the various dependencies.” The MBEB data set used in this study can certainly be viewed as hierarchical; three explanatory variables (gender, maturational status, and consecutive bout number) exist at all levels of exercise intensity, and one single outcome variable (a physiological response) is measured repeatedly for each subject. Initial analysis revealed high levels of intra-class correlation, with clustering of individuals within puberty and gender groups and variables measured at two separate exercise intensities (treatments). Cross-level investigations were required to address our research hypotheses.</p>
 <p>The MLM approach provides several advantages in this setting. By the nature of our experiment, individual observations are longitudinal and therefore could not be considered completely independent. Mixed-effects modeling does not suffer from the restrictions of the independence assumption. We are also able to draw important conclusions on the condition of interest while accounting for variability within and across participants and Gender × Puberty groups.</p>
 <p>The purpose for using a linear mixed effects model in this study was to effectively capture linear trends of the physiological responses from bout-to-bout, while allowing for between-subject variation through random slopes and intercepts.</p>
+</div>
 <div id="the-modeling-process." class="section level1">
 <h1>The Modeling Process.</h1>
 <p>Each participant’s average on-transient and off-transient response was calculated by using the mean value of their physiological response over that bout’s associated time period. This method of modeling the mean bout response was intended to facilitate a straightforward set of linear models capable of describing trends in the on-transient and off-transient periods.</p>
 <p>For each response variable of interest, a linear mixed effects regression was conducted to model the mean on-transient values, and a second linear regression modelled the off-transient means. This dual-model design allows for separate analyses for exercise periods compared to rest periods; treating exercise and rest recovery as uncoupled processes allowed for detailed insight into the on-transient and off-transient responses in each Gender × Puberty group.</p>
 <p>The hierarchical nature of the MBEB experiment was represented in each regression model. Test intensity (work rate) was considered the Level 2 grouping factor. Nested within each intensity treatment, participants were labelled by their Level 1 explanatory variables: Gender and Maturational Status. The bout sequence number was used as the repeated measures variable.</p>
 <p>In total, 14 mixed effects regression models were generated, including an on- and off-transient model for each of the commonly measured CPET signals: Heart Rate, VO2/kg, VCO2/kg, RQ, VE/kg, RR, and the VE/VCO2 ratio. All MLMs were developed using the Linear Mixed Effects Models ‘lme4’ package (Version 1.1-27.1) in Rstudio (Version 1.4.1103). Models were fit with restricted maximum likelihood if they failed to converge otherwise.</p>
-<pre><code>The final MLMs were chosen through a stepwise variable selection approach that began with the most complex model. Fixed effects considered in the full model were: Gender, a factor with two levels (Male, Female); Maturational status, a factor with two levels (Early, Late); work intensity, a factor with two levels (Low, High); and Bout, a discrete integer predictor in the range of 0 to 5. Any reference to “Bout 0” is equivalent to the baseline measurement (prior to the subject initiating any exercise bouts). Random slope and intercept were allowed in the bout term for each participant ID in order to account for individual variation between subjects. This controlled for innate differences between subjects’ physical fitness levels, psychological motivation, and other non-measured variables. If the full model showed insignificance (p-value &gt; 0.05) in the four-way interaction (Gender*Puberty*Intensity*Bout), the model was re-fit with only three-way interactions. </code></pre>
+<p>The final MLMs were chosen through a stepwise variable selection approach that began with the most complex model. Fixed effects considered in the full model were: Gender, a factor with two levels (Male, Female); Maturational status, a factor with two levels (Early, Late); work intensity, a factor with two levels (Low, High); and Bout, a discrete integer predictor in the range of 0 to 5. Any reference to “Bout 0” is equivalent to the baseline measurement (prior to the subject initiating any exercise bouts). Random slope and intercept were allowed in the bout term for each participant ID in order to account for individual variation between subjects. This controlled for innate differences between subjects’ physical fitness levels, psychological motivation, and other non-measured variables. If the full model showed insignificance (p-value &gt; 0.05) in the four-way interaction (Gender<em>Puberty</em>Intensity*Bout), the model was re-fit with only three-way interactions.</p>
 </div>
 
 
