@@ -23,6 +23,8 @@
 <script src="site_libs/navigation-1.1/tabsets.js"></script>
 <link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-5.1.0/css/all.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-5.1.0/css/v4-shims.css" rel="stylesheet" />
 
 <link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
 <!-- Add a small amount of space between sections. -->
@@ -303,7 +305,13 @@ $(document).ready(function () {
 </li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
-        
+        <li>
+  <a href="https://github.com/nickcoronato/MBEB-CPET">
+    <span class="fas fa-github"></span>
+     
+    Source code
+  </a>
+</li>
       </ul>
     </div><!--/.nav-collapse -->
   </div><!--/.container -->
@@ -338,7 +346,7 @@ $(document).ready(function () {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-07-16
+<strong>Last updated:</strong> 2021-07-30
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 2 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 0
@@ -369,22 +377,85 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstronge2270e0"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> e2270e0 </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree526b358356ec9db52ebdfacf4289f5f2120353e2targetblank526b358a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/526b358356ec9db52ebdfacf4289f5f2120353e2" target="_blank">526b358</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstronge2270e0" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree526b358356ec9db52ebdfacf4289f5f2120353e2targetblank526b358a" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version e2270e0. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/526b358356ec9db52ebdfacf4289f5f2120353e2" target="_blank">526b358</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
 </p>
 <pre><code>
-working directory clean
+Ignored files:
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    analysis/.Rhistory
+
+Untracked files:
+    Untracked:  analysis/HR_on_FEH.jpeg
+    Untracked:  analysis/VCO2_off_FEH.jpeg
+    Untracked:  analysis/VCO2_on_FEH.jpeg
+    Untracked:  analysis/avgHRon.csv
+    Untracked:  data/all_data.csv
+    Untracked:  data/avg_HR_off.csv
+    Untracked:  data/avg_HR_on.csv
+    Untracked:  data/avg_RR_off.csv
+    Untracked:  data/avg_RR_on.csv
+    Untracked:  data/avg_VCO2_off.csv
+    Untracked:  data/avg_VCO2_on.csv
+    Untracked:  data/avg_VE_off.csv
+    Untracked:  data/avg_VE_on.csv
+    Untracked:  data/avg_VO2_off.csv
+    Untracked:  data/avg_VO2_on.csv
+    Untracked:  output/HRmodels.html
+    Untracked:  output/HRoffcoefs.csv
+    Untracked:  output/HRoncoefs.csv
+    Untracked:  output/RQmodels.html
+    Untracked:  output/RQoffcoefs.csv
+    Untracked:  output/RQoncoefs.csv
+    Untracked:  output/RRmodels.html
+    Untracked:  output/RRoffcoefs.csv
+    Untracked:  output/RRoncoefs.csv
+    Untracked:  output/VCO2models.html
+    Untracked:  output/VCO2offcoefs.csv
+    Untracked:  output/VCO2oncoefs.csv
+    Untracked:  output/VE.VCO2models.html
+    Untracked:  output/VE.VCO2offcoefs.csv
+    Untracked:  output/VE.VCO2oncoefs.csv
+    Untracked:  output/VEmodels.html
+    Untracked:  output/VEoffcoefs.csv
+    Untracked:  output/VEoncoefs.csv
+    Untracked:  output/VO2models.html
+    Untracked:  output/VO2offcoefs.csv
+    Untracked:  output/VO2oncoefs.csv
+    Untracked:  output/avgHRon.csv
+    Untracked:  output/dat.HRoff.csv
+    Untracked:  output/dat.HRon.csv
+    Untracked:  output/dat.RQoff.csv
+    Untracked:  output/dat.RQon.csv
+    Untracked:  output/dat.RRoff.csv
+    Untracked:  output/dat.RRon.csv
+    Untracked:  output/dat.VCO2kglbmoff.csv
+    Untracked:  output/dat.VCO2kglbmon.csv
+    Untracked:  output/dat.VCO2off.csv
+    Untracked:  output/dat.VCO2on.csv
+    Untracked:  output/dat.VE.VCO2off.csv
+    Untracked:  output/dat.VE.VCO2on.csv
+    Untracked:  output/dat.VEkglbmoff.csv
+    Untracked:  output/dat.VEkglbmon.csv
+    Untracked:  output/dat.VO2KGLBMoff.csv
+    Untracked:  output/dat.VO2KGLBMon.csv
+    Untracked:  output/dat.VO2KGoff.csv
+    Untracked:  output/dat.VO2KGon.csv
+    Untracked:  output/plots/
+    Untracked:  site_libs/
+
 </code></pre>
 <p>
 Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
@@ -427,7 +498,41 @@ Message
 Rmd
 </td>
 <td>
-e2270e0
+<a href="https://github.com/nickcoronato/MBEB-CPET/blob/526b358356ec9db52ebdfacf4289f5f2120353e2/analysis/about.Rmd" target="_blank">526b358</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-30
+</td>
+<td>
+Update the About page.
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/nickcoronato/MBEB-CPET/1e6045b34c083ac386009ea47886b6bf07afadb2/docs/about.html" target="_blank">1e6045b</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-16
+</td>
+<td>
+Build site.
+</td>
+</tr>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/nickcoronato/MBEB-CPET/blob/e2270e07bab2c723ed81b7736d894c3b167c8c4f/analysis/about.Rmd" target="_blank">e2270e0</a>
 </td>
 <td>
 nickcoronato
@@ -446,7 +551,8 @@ Start workflowr project.
 </div>
 </div>
 </div>
-<p>Describe your project.</p>
+<p>This analysis is conducted in support of the publication “Heart Rate and Gas Exchange Dynamic Responses to Multiple Brief Exercise Bouts (MBEB) in Early and Late Pubertal Boys and Girls” (Bar-Yoseph, Cooper, Aizik et al.). Analysis was conducted in the spring and summer of 2021.</p>
+<p>The author of this code is Nicholas Coronato, MS Graduate Student and Researcher, Systems Engineering, University of Virginia, USA. The author is reachable at <a href="mailto:njc7f@virginia.edu" class="email">njc7f@virginia.edu</a>.</p>
 
 
 <!-- Adjust MathJax settings so that all math formulae are shown using
