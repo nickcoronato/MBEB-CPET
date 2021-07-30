@@ -7,4 +7,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-Describe your project.
+This analysis is conducted in support of the publication "Heart Rate and Gas Exchange Dynamic Responses to Multiple Brief Exercise Bouts (MBEB) in Early and Late Pubertal Boys and Girls" (Bar-Yoseph, Cooper, Aizik et al.). Analysis was conducted in the spring and summer of 2021.
+
+The author of this code is Nicholas Coronato, MS Graduate Student and Researcher, Systems Engineering, University of Virginia, USA. The author is reachable at njc7f@virginia.edu.
