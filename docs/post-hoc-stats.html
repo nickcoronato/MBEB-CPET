@@ -426,7 +426,7 @@ div.tocify {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-07-28
+<strong>Last updated:</strong> 2021-08-04
 </p>
 <p>
 <strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 7 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 0
@@ -517,16 +517,16 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree87efcc28207a57901e961ef619b2194db8984d47targetblank87efcc2a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/87efcc28207a57901e961ef619b2194db8984d47" target="_blank">87efcc2</a> </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree43ffd0c09680087dbf8848749b3e1c6224b9f69dtargetblank43ffd0ca"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/nickcoronato/MBEB-CPET/tree/43ffd0c09680087dbf8848749b3e1c6224b9f69d" target="_blank">43ffd0c</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree87efcc28207a57901e961ef619b2194db8984d47targetblank87efcc2a" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomnickcoronatoMBEBCPETtree43ffd0c09680087dbf8848749b3e1c6224b9f69dtargetblank43ffd0ca" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/87efcc28207a57901e961ef619b2194db8984d47" target="_blank">87efcc2</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version <a href="https://github.com/nickcoronato/MBEB-CPET/tree/43ffd0c09680087dbf8848749b3e1c6224b9f69d" target="_blank">43ffd0c</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -542,6 +542,7 @@ Untracked files:
     Untracked:  analysis/VCO2_off_FEH.jpeg
     Untracked:  analysis/VCO2_on_FEH.jpeg
     Untracked:  analysis/avgHRon.csv
+    Untracked:  analysis/ggplot_the_model.Rmd
     Untracked:  data/all_data.csv
     Untracked:  data/avg_HR_off.csv
     Untracked:  data/avg_HR_on.csv
@@ -593,6 +594,7 @@ Untracked files:
     Untracked:  output/dat.VO2KGLBMon.csv
     Untracked:  output/dat.VO2KGoff.csv
     Untracked:  output/dat.VO2KGon.csv
+    Untracked:  output/meanplots/
     Untracked:  output/plots/
     Untracked:  site_libs/
 
@@ -633,6 +635,40 @@ Message
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+<a href="https://github.com/nickcoronato/MBEB-CPET/blob/43ffd0c09680087dbf8848749b3e1c6224b9f69d/analysis/post-hoc-stats.Rmd" target="_blank">43ffd0c</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-08-04
+</td>
+<td>
+Update to all three analysis files.
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/nickcoronato/MBEB-CPET/9406145a622ff2773d5750fcc3c3e38d23038da3/docs/post-hoc-stats.html" target="_blank">9406145</a>
+</td>
+<td>
+nickcoronato
+</td>
+<td>
+2021-07-28
+</td>
+<td>
+Build site.
+</td>
+</tr>
 <tr>
 <td>
 Rmd
@@ -874,7 +910,7 @@ avgHRon$bout &lt;- as.factor(avgHRon$bout) # for post-hoc analysis, we code the 
 HRon &lt;- lmer(avgHR~Gender+Tanner*bout * intensity + (bout|ID)  , data = avgHRon, REML=FALSE)</code></pre>
 <pre><code>boundary (singular) fit: see ?isSingular</code></pre>
 <p>Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.</p>
-<pre class="r"><code>HRon.emm &lt;- emmeans(HRon, ~ bout |intensity*Gender*Tanner)</code></pre>
+<pre class="r"><code>HRon.emm &lt;- emmeans(HRon, ~ bout[1,2,3,4,5] |intensity*Gender*Tanner)</code></pre>
 <pre><code>boundary (singular) fit: see ?isSingular</code></pre>
 <pre class="r"><code>HRon.emm</code></pre>
 <pre><code>intensity = high, Gender = FEMALE, Tanner = Early:
@@ -952,8 +988,7 @@ intensity = low, Gender = MALE, Tanner = Late:
 Degrees-of-freedom method: kenward-roger 
 Confidence level used: 0.95 </code></pre>
 <p>It might be nice to extract these estimates and plot them:</p>
-<pre class="r"><code>HRon.emm.df &lt;-
-  HRon.emm %&gt;%
+<pre class="r"><code>HRon.emm.df &lt;- HRon.emm %&gt;%
   broom::tidy()
 
 HRon.emm.df %&gt;%
