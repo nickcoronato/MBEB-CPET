@@ -173,14 +173,13 @@ HRon <- lmer(avgHR~Gender+Tanner*bout * intensity + (bout|ID)  , data = avgHRon,
 
 Below, we generate estimated marginal means for bout, as nested in intensity, Gender, and Tanner levels.
 ```{r}
-HRon.emm <- emmeans(HRon, ~ bout |intensity*Gender*Tanner)
+HRon.emm <- emmeans(HRon, ~ bout[1,2,3,4,5] |intensity*Gender*Tanner)
 HRon.emm
 ```
 It might be nice to extract these estimates and plot them:
 
 ```{r}
-HRon.emm.df <-
-  HRon.emm %>%
+HRon.emm.df <- HRon.emm %>%
   broom::tidy()
 
 HRon.emm.df %>%

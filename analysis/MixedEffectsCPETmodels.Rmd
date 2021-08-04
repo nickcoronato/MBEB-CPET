@@ -6,10 +6,6 @@ output: workflowr::wflow_html
 editor_options:
   chunk_output_type: console
 ---
-```{r options1}
-options(max.print=99999)
-```
-
 ```{r load libraries, echo = FALSE}
 # Call the appropriate libraries.
 library(tidyverse)
@@ -34,6 +30,11 @@ library(ggiraph)
 library(ggiraphExtra)
 library(ggeffects)
 library(emmeans)
+library(performance)
+```
+```{r options1}
+options(max.print=99999)
+control=lmerControl(check.conv.singular = .makeCC(action = "ignore",  tol = 1e-4))
 ```
 
 # Data preparation
@@ -201,33 +202,44 @@ The first physiological signal for analysis is Heart Rate (HR).
 
 ## HR ON Transient
 
-### Model 1: All interactions
+### Null Model
+The null model does not use any predictor variables from the other levels (Gender, Tanner, intensity, bout). This is also considered the "intercept only" model.
+```{r}
+nullmod <- lmer(avgHR ~ 1 + (1|ID), data = avgHRon, REML = TRUE)
+(summ(nullmod) ->summnullHRon)
+(BIC(nullmod) -> BICnullHRon)
+(summnullHRon$gvars[,3] -> ICCnullHRon)
+```
 
+### Model 1: All interactions
+The intermediate model uses all predictor variables and their interactions (Gender, Tanner, intensity, bout) with a random slope.
 ```{r m1 HRon}
-m1 <- lmer(avgHR~Gender*Tanner*intensity*bout +(bout|ID), data = avgHRon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
+intHRon <- lmer(avgHR~Gender*Tanner*intensity*bout +(bout|ID), data = avgHRon, REML=FALSE)
+# summary(intHRon)
+(summ(intHRon)->summintHRon)
+(BIC(intHRon) -> BICintHRon)
+(summintHRon$gvars[,3] -> ICCintHRon)
+# coef(intHRon)
+# fixef(intHRon)
+# ranef(intHRon)
 ```
 
 ### Model 1B: Some interactions
-
+The final model uses a subset of the predictor variables; the three-way interaction of Tanner:Bout:Intensity is the highest-level interaction with reported significance level p<=0.05. Model 1B becomes the final model for on-transient HR, 'HRon'.
 ```{r m1B HRon}
-m1B <- lmer(avgHR~Gender+Tanner*bout * intensity + (bout|ID)  , data = avgHRon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-HRon <- m1B
+HRon <- lmer(avgHR~Gender + Tanner * bout * intensity + (bout|ID)  , data = avgHRon, REML=FALSE)
+# summary(HRon)
+# coef(HRon)
+# ranef(HRon)
+(summ(HRon)->summHRon)
+(BIC(HRon) -> BICHRon)
+(summHRon$gvars[,3] -> ICCHRon)
 ```
 
 ### Comparing On transient models
 ```{r compare HRon}
-improve.fit(m1B,m1)
-
-anova(m1, m1B)
+improve.fit(HRon,intHRon)
+anova(HRon, intHRon)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -243,44 +255,48 @@ write.csv(HRoncoefs,"~/R/MBEB-CPET/output/HRoncoefs.csv", row.names = TRUE)
 
 
 ## HR OFF transient
+### Null Model
+The null model does not use any predictor variables from the other levels (Gender, Tanner, intensity, bout). This is also considered the "intercept only" model.
+```{r}
+nullmod <- lmer(avgHR ~ 1 + (1|ID), data = avgHRoff, REML = TRUE)
+(summ(nullmod) ->summnullHRoff)
+(BIC(nullmod) -> BICnullHRoff)
+(summnullHRoff$gvars[,3] -> ICCnullHRoff)
+```
+
 ### Model 2: OFF TRANSIENT: All interactions
 
 ```{r m2 HRoff}
-m2 <- lmer(avgHR~Gender*Tanner*bout*intensity + (bout|ID)  , data = avgHRoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r m2B HRoff}
-m2B <- lmer(avgHR~Gender*Tanner*bout + intensity + (bout|ID)  , data = avgHRoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# fixef(m2B)
-# ranef(m2B)
+intHRoff <- lmer(avgHR~Gender*Tanner*bout*intensity + (bout|ID)  , data = avgHRoff, REML=FALSE)
+# summary(intHRoff)
+(summ(intHRoff)->summintHRoff)
+(BIC(intHRoff) -> BICintHRoff)
+(summintHRoff$gvars[,3] -> ICCintHRoff)
+# coef(intHRoff)
+# ranef(intHRoff)
 ```
 
 ### Model 2C: Some interactions
 ```{r m2c HRoff}
-m2C <- lmer(avgHR~ bout * intensity + Tanner*intensity + Gender*intensity + (bout|ID)  ,  data = avgHRoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# fixef(m2C)
-# ranef(m2C)
-HRoff <- m2C
+HRoff <- lmer(avgHR~ bout * intensity + Tanner*intensity + Gender*intensity + (bout|ID)  ,  data = avgHRoff, REML=FALSE)
+# summary(intHRoff)
+(summ(HRoff)->summHRoff)
+(BIC(HRoff) -> BICHRoff)
+(summHRoff$gvars[,3] -> ICCHRoff)
+# coef(intHRoff)
+# fixef(intHRoff)
+# ranef(intHRoff)
 ```
 
 ### Comparing Off transient models
 ```{r compare HRoff}
-improve.fit(m2B,m2)
-improve.fit(m2C,m2B)
-
-anova(m2C, m2B)
+improve.fit(HRoff,intHRoff)
+anova(HRoff, intHRoff)
+```
+```{r bayes factor HRoff}
+# Bayes factor = probability of full model / probability of reduced model - it's an odds. We can approximate BF using BIC:
+# in general, BF >10 = strong evidence in favor of the model in the numerator
+bf.bic(HRoff,intHRoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -294,144 +310,6 @@ HRoffcoefs <- tibble(demographics, HRoffcoefs$bout)
 write.csv(HRoffcoefs,"~/R/MBEB-CPET/output/HRoffcoefs.csv", row.names = TRUE)
 ```
 
-```{r bayes factor HRoff}
-# Bayes factor = probability of full model / probability of reduced model - it's an odds. We can approximate BF using BIC:
-# in general, BF >10 = strong evidence in favor of the model in the numerator
-bf.bic(m2C,m2)
-bf.bic(m1B,m1)
-```
-
-
-## VO2/kg On Transient
-
-First, pull out the average on and off transient VO2kg values for each bout.
-```{r compute avgVO2}
-avgVO2kgon <- aggregate(ontransbouts$'VO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
-names(avgVO2kgon)[6] <- "avgVO2kg"
-
-avgVO2kgoff <- aggregate(offtransbouts$'VO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
-names(avgVO2kgoff)[6] <- "avgVO2kg"
-```
-
-
-## Plot the average VO2kg data distributions.
-```{r plot avgVO2}
-#plot the avg ON-transient VO2kg
-ggplot(data=avgVO2kgon, aes(bout, avgVO2kg, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
-
-#plot the avg off-transient VO2kg
-ggplot(data=avgVO2kgoff, aes(bout, avgVO2kg, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VO2/kg rates")
-
-ggplot(data=filter(avgVO2kgon, intensity == "low"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kg for on-transient periods") + ylim(0,75) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVO2kgoff, intensity == "low"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VO2kg for off-transient periods")+  ylim(0,75) 
-
-ggplot(data=filter(avgVO2kgon, intensity == "high"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kg for on-transient periods")  + ylim(0,75) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVO2kgoff, intensity == "high"), aes(x = bout,y= avgVO2kg, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kg for off-transient periods") + ylim(0,75)  
-```
-
-## Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
-```{r xyplot avgVO2}
-xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = Gender, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVO2kg ~ bout | ID, data = avgVO2kgon, groups = intensity, type = c("p","r"), auto.key = TRUE)
-```
-
-## More visualizations
-```{r flexplot avgVO2}
-### categorical variable
-flexplot(avgVO2kg~Gender, data=avgVO2kgon, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVO2kg~Gender, data=avgVO2kgoff, spread="quartiles", jitter=c(.1, 0))
-
-flexplot(avgVO2kg~Tanner, data=avgVO2kgon, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVO2kg~Tanner, data=avgVO2kgoff, spread="quartiles", jitter=c(.1, 0))
-
-
-### show a straight line, remove standard errors, and specify 2 bins
-flexplot(avgVO2kg~bout + intensity | Gender + Tanner, data=avgVO2kgon, method="lm", se=F, bins=2)
-
-### multivariate relationship
-flexplot(avgVO2kg~bout + intensity | Gender + Tanner, data=avgVO2kgon)
-flexplot(avgVO2kg~bout + Gender | intensity + Tanner, data=avgVO2kgon)
-flexplot(avgVO2kg~bout + Tanner | intensity + Gender, data=avgVO2kgon)
-```
-
-
-### Model 1: All interactions
-
-```{r m1 VO2on}
-m1 <- lmer(avgVO2kg~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVO2kgon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r m1b vo2on}
-m1B <- lmer(avgVO2kg~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kgon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-```
-
-### Model 1C: No interactions
-
-```{r m1c vo2on}
-m1C <- lmer(avgVO2kg~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kgon, REML=FALSE)
-# summary(m1C)
-summ(m1C)
-# coef(m1C)
-# fixef(m1C)
-# ranef(m1C)
-VO2KGon <- m1C
-```
-
-
-
-## VO2kg OFF TRANSIENT
-
-### Model 2: All interactions
-
-```{r m2 vo2off}
-m2 <- lmer(avgVO2kg~Gender*Tanner*bout*intensity +(bout|ID) ,data = avgVO2kgoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r m2b vo2off}
-m2B <- lmer(avgVO2kg~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kgoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# fixef(m2B)
-# ranef(m2B)
-```
-
-### Model 2C: Some interactions
-```{r m2c vo2off}
-m2C <- lmer(avgVO2kg~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kgoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# # fixef(m2C)
-# ranef(m2C)
-VO2KGoff <- m2C
-```
-
-
 ## VO2/kg LEAN BODY MASS On Transient
 
 First, pull out the average on and off transient VO2kg values for each bout.
@@ -444,7 +322,7 @@ names(avgVO2kglbmoff)[6] <- "avgVO2kglbm"
 ```
 
 
-## Plot the average VO2kglbm data distributions.
+### Plot the average VO2kglbm data distributions.
 ```{r plot vo2kglbm}
 #plot the avg ON-transient VO2kglbm
 ggplot(data=avgVO2kglbmon, aes(bout, avgVO2kglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
@@ -463,7 +341,7 @@ ggplot(data=filter(avgVO2kglbmon, intensity == "high"), aes(x = bout,y= avgVO2kg
 ggplot(data=filter(avgVO2kglbmoff, intensity == "high"), aes(x = bout,y= avgVO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VO2kglbm for off-transient periods") + ylim(0,75)  
 ```
 
-## Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r xyplot vo2kglbm}
 xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -472,7 +350,7 @@ xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = Tanner, type = c(
 xyplot(avgVO2kglbm ~ bout | ID, data = avgVO2kglbmon, groups = intensity, type = c("p","r"), auto.key = TRUE)
 ```
 
-## More visualizations
+### More visualizations
 ```{r flexplot vo2kglbm}
 ### categorical variable
 flexplot(avgVO2kglbm~Gender, data=avgVO2kglbmon, spread="quartiles", jitter=c(.1, 0))
@@ -491,37 +369,37 @@ flexplot(avgVO2kglbm~bout + Tanner | intensity + Gender, data=avgVO2kglbmon)
 ```
 
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgVO2kglbm ~ 1 + (1|ID), data = avgVO2kglbmon, REML = TRUE)
+(summ(nullmod) ->summnullVO2KGLBMon)
+(BIC(nullmod) -> BICnullVO2KGLBMon)
+(summnullVO2KGLBMon$gvars[,3] -> ICCnullVO2KGLBMon)
+```
 ### Model 1: All interactions
 
 ```{r m1 vo2kglbmon}
-m1 <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVO2kglbmon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r m1b vo2kglbmon}
-m1B <- lmer(avgVO2kglbm~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kglbmon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
+intVO2KGLBMon <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+# summary(intVO2KGLBMon)
+(summ(intVO2KGLBMon)->summintVO2KGLBMon)
+(BIC(intVO2KGLBMon) -> BICintVO2KGLBMon)
+(summintVO2KGLBMon$gvars[,3] -> ICCintVO2KGLBMon)
+# coef(intVO2KGLBMon)
+# fixef(intVO2KGLBMon)
+# ranef(intVO2KGLBMon)
 ```
 
 ### Model 1C: Some interactions
 
 ```{r m1c vo2kglbmon}
-m1C <- lmer(avgVO2kglbm~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kglbmon, REML=FALSE)
-# summary(m1C)
-summ(m1C)
-# coef(m1C)
-# fixef(m1C)
-# ranef(m1C)
-VO2KGLBMon <- m1C
+VO2KGLBMon <- lmer(avgVO2kglbm~ bout*intensity + Gender* intensity + Tanner + (bout|ID) , data = avgVO2kglbmon, REML=FALSE)
+# summary(VO2KGLBMon)
+# coef(VO2KGLBMon)
+# ranef(VO2KGLBMon)
+(summ(VO2KGLBMon)->summVO2KGLBMon)
+(BIC(VO2KGLBMon) -> BICVO2KGLBMon)
+(summVO2KGLBMon$gvars[,3] -> ICCVO2KGLBMon)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -537,36 +415,36 @@ write.csv(VO2oncoefs,"~/R/MBEB-CPET/output/VO2oncoefs.csv", row.names = TRUE)
 
 ## VO2kglbm OFF TRANSIENT
 
+### Null Model
+```{r}
+nullmod <- lmer(avgVO2kglbm ~ 1 + (1|ID), data = avgVO2kglbmoff, REML = TRUE)
+(summ(nullmod) ->summnullVO2KGLBMoff)
+(BIC(nullmod) -> BICnullVO2KGLBMoff)
+(summnullVO2KGLBMoff$gvars[,3] -> ICCnullVO2KGLBMoff)
+```
+
 ### Model 2: All interactions
 
 ```{r m2 vo2kglbmoff}
-m2 <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) ,data = avgVO2kglbmoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r m2b vo2kglbmoff}
-m2B <- lmer(avgVO2kglbm~Gender*Tanner*bout + intensity +(bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# fixef(m2B)
-# ranef(m2B)
+intVO2KGLBMoff <- lmer(avgVO2kglbm~Gender*Tanner*bout*intensity +(bout|ID) ,data = avgVO2kglbmoff, REML=FALSE)
+# summary(intVO2KGLBMoff)
+(summ(intVO2KGLBMoff)->summintVO2KGLBMoff)
+(BIC(intVO2KGLBMoff) -> BICintVO2KGLBMoff)
+(summintVO2KGLBMoff$gvars[,3] -> ICCintVO2KGLBMoff)
+# coef(intVO2KGLBMoff)
+# fixef(intVO2KGLBMoff)
+# ranef(intVO2KGLBMoff)
 ```
 
 ### Model 2C: Some interactions
 ```{r m2c vo2kglbmoff}
-m2C <- lmer(avgVO2kglbm~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# # fixef(m2C)
-# ranef(m2C)
-VO2KGLBMoff <- m2C
+VO2KGLBMoff <- lmer(avgVO2kglbm~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID) , data = avgVO2kglbmoff, REML=FALSE)
+# summary(VO2KGLBMoff)
+# coef(VO2KGLBMoff)
+# ranef(VO2KGLBMoff)
+(summ(VO2KGLBMoff)->summVO2KGLBMoff)
+(BIC(VO2KGLBMoff) -> BICVO2KGLBMoff)
+(summVO2KGLBMoff$gvars[,3] -> ICCVO2KGLBMoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -580,112 +458,7 @@ VO2offcoefs <- tibble(demographics, VO2offcoefs$bout)
 write.csv(VO2offcoefs,"~/R/MBEB-CPET/output/VO2offcoefs.csv", row.names = TRUE)
 ```
 
-
-# VCO2/kg On Transient
-
-First, pull out the average on and off transient VCO2 values for each bout.
-```{r compute VCO2 avgs}
-avgVCO2on <- aggregate(ontransbouts$'VCO2/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
-names(avgVCO2on)[6] <- "avgVCO2"
-
-avgVCO2off <- aggregate(offtransbouts$'VCO2/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
-names(avgVCO2off)[6] <- "avgVCO2"
-```
-
-##Plot the average VCO2 data distributions.
-```{r plot VCO2 }
-#plot the avg ON-transient VCO2
-ggplot(data=avgVCO2on, aes(bout, avgVCO2, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
-
-#plot the avg off-transient VCO2
-ggplot(data=avgVCO2off, aes(bout, avgVCO2, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VCO2 rates")
-
-ggplot(data=filter(avgVCO2on, intensity == "low"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2 for on-transient periods") + ylim(0,0.2) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVCO2off, intensity == "low"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VCO2 for off-transient periods")+ ylim(0,0.2)
-
-ggplot(data=filter(avgVCO2on, intensity == "high"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2 for on-transient periods")  + ylim(0,0.2) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVCO2off, intensity == "high"), aes(x = bout,y= avgVCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2 for off-transient periods") + ylim(0,0.2)  
-```
-
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
-```{r xyplot VCO2 }
-xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = Gender, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = Tanner, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVCO2 ~ bout | ID, data = avgVCO2on, groups = intensity, type = c("p","r"), auto.key = TRUE)
-```
-
-### More visualizations
-```{r flexplot VCO2}
-### categorical variable
-flexplot(avgVCO2~Gender, data=avgVCO2on, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVCO2~Gender, data=avgVCO2off, spread="quartiles", jitter=c(.1, 0))
-
-flexplot(avgVCO2~Tanner, data=avgVCO2on, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVCO2~Tanner, data=avgVCO2off, spread="quartiles", jitter=c(.1, 0))
-
-### show a straight line, remove standard errors, and specify 2 bins
-flexplot(avgVCO2~bout + intensity | Gender + Tanner, data=avgVCO2on, method="lm", se=F, bins=2)
-
-### multivariate relationship
-flexplot(avgVCO2~bout + intensity | Gender + Tanner, data=avgVCO2on)
-flexplot(avgVCO2~bout + Gender | intensity + Tanner, data=avgVCO2on)
-flexplot(avgVCO2~bout + Tanner | intensity + Gender, data=avgVCO2on)
-```
-
-### Model 1: All interactions
-
-```{r m1 VCO2on}
-m1 <- lmer(avgVCO2~bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVCO2on, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r m1b VCO2on}
-m1B <- lmer(avgVCO2~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2on, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-VCO2on <- m1B
-```
-
-# VCO2/kg OFF TRANSIENT
-
-### Model 2: All interactions
-
-```{r m2 VCO2off}
-m2 <- lmer(avgVCO2~Gender*Tanner*bout*intensity + (bout|ID) , data = avgVCO2off, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r m2b VCO2off}
-m2B <- lmer(avgVCO2~Gender * intensity * Tanner + bout +(bout|ID) ,  data = avgVCO2off, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# fixef(m2B)
-# ranef(m2B)
-VCO2off <- m2B
-```
-
-
-# VCO2/kg lean body mass On Transient
+## VCO2/kg lean body mass On Transient
 
 First, pull out the average on and off transient VCO2kglbm values for each bout.
 ```{r compute VCO2kglbm avg}
@@ -696,7 +469,7 @@ avgVCO2kglbmoff <- aggregate(offtransbouts$'VCO2/kglbm', by=list(bout=offtransbo
 names(avgVCO2kglbmoff)[6] <- "avgVCO2kglbm"
 ```
 
-##Plot the average VCO2kglbm data distributions.
+### Plot the average VCO2kglbm data distributions.
 ```{r plot VCO2kglbm}
 #plot the avg ON-transient VCO2kglbm
 ggplot(data=avgVCO2kglbmon, aes(bout, avgVCO2kglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VO2/kg rates")
@@ -715,7 +488,7 @@ ggplot(data=filter(avgVCO2kglbmon, intensity == "high"), aes(x = bout,y= avgVCO2
 ggplot(data=filter(avgVCO2kglbmoff, intensity == "high"), aes(x = bout,y= avgVCO2kglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VCO2kglbm for off-transient periods") + ylim(0,0.2)
 ```
 
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r xyplot VCO2kglbm}
 xyplot(avgVCO2kglbm ~ bout | ID, data = avgVCO2kglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -742,85 +515,97 @@ flexplot(avgVCO2kglbm~bout + Gender | intensity + Tanner, data=avgVCO2kglbmon)
 flexplot(avgVCO2kglbm~bout + Tanner | intensity + Gender, data=avgVCO2kglbmon)
 ```
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgVCO2kglbm ~ 1 + (1|ID), data = avgVCO2kglbmon, REML = TRUE)
+(summ(nullmod) ->summnullVCO2kglbmon)
+(BIC(nullmod) -> BICnullVCO2kglbmon)
+(summnullVCO2kglbmon$gvars[,3] -> ICCnullVCO2kglbmon)
+```
+
 ### Model 1: All interactions
 
 ```{r m1 VCO2kglbmon}
-m1 <- lmer(avgVCO2kglbm~bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVCO2kglbmon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
+intVCO2kglbmon <- lmer(avgVCO2kglbm~bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVCO2kglbmon, REML=FALSE)
+# summary(intVCO2kglbmon)
+(summ(intVCO2kglbmon)->summintVCO2kglbmon)
+(BIC(intVCO2kglbmon) -> BICintVCO2kglbmon)
+(summintVCO2kglbmon$gvars[,3] -> ICCintVCO2kglbmon)
+# coef(intVCO2kglbmon)
+# fixef(intVCO2kglbmon)
+# ranef(intVCO2kglbmon)
 ```
 
 ### Model 1B: Some interactions
 
 ```{r m1b VCO2kglbmon}
-m1B <- lmer(avgVCO2kglbm~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2kglbmon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-VCO2kglbmon <- m1B
+VCO2kglbmon <- lmer(avgVCO2kglbm~ Gender + Tanner*bout + Tanner*intensity + Gender*intensity + (bout|ID), data = avgVCO2kglbmon, REML=FALSE)
+# summary(VCO2kglbmon)
+# coef(VCO2kglbmon)
+# ranef(VCO2kglbmon)
+(summ(VCO2kglbmon)->summVCO2kglbmon)
+(BIC(VCO2kglbmon) -> BICVCO2kglbmon)
+(summVCO2kglbmon$gvars[,3] -> ICCVCO2kglbmon)
 ```
 
 ### Create a tibble of model coefficients by ID.
 This generates a table of individualized coefficients for each subject, which includes fixed effects + random effects. These will be used for analysis of group averages.
 
 ```{r VCO2kglbmon coefs}
-VCO2oncoefs <- as_tibble(coef(VCO2on)$ID)
+VCO2oncoefs <- as_tibble(coef(VCO2kglbmon)$ID)
 
 VCO2oncoefs <- tibble(demographics, VCO2oncoefs$bout)
 
 write.csv(VCO2oncoefs,"~/R/MBEB-CPET/output/VCO2oncoefs.csv", row.names = TRUE)
 ```
 
-# VCO2kglbm OFF TRANSIENT
+## VCO2/kg lean body mass OFF TRANSIENT
+
+### Null Model
+```{r}
+nullmod <- lmer(avgVCO2kglbm ~ 1 + (1|ID), data = avgVCO2kglbmoff, REML = TRUE)
+(summ(nullmod) ->summnullVCO2kglbmoff)
+(BIC(nullmod) -> BICnullVCO2kglbmoff)
+(summnullVCO2kglbmoff$gvars[,3] -> ICCnullVCO2kglbmoff)
+```
 
 ### Model 2: All interactions
 
 ```{r m2 VCO2kglbmoff}
-m2 <- lmer(avgVCO2kglbm~Gender*Tanner*bout*intensity + (bout|ID) , data = avgVCO2kglbmoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r m2b VCO2kglbmoff}
-m2B <- lmer(avgVCO2kglbm~Gender * intensity * Tanner + bout +(bout|ID) ,  data = avgVCO2kglbmoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# fixef(m2B)
-# ranef(m2B)
+intVCO2kglbmoff <- lmer(avgVCO2kglbm~Gender*Tanner*bout*intensity + (bout|ID) , data = avgVCO2kglbmoff, REML=FALSE)
+# summary(intVCO2kglbmoff)
+(summ(intVCO2kglbmon)->summintVCO2kglbmon)
+(BIC(intVCO2kglbmon) -> BICintVCO2kglbmon)
+(summintVCO2kglbmon$gvars[,3] -> ICCintVCO2kglbmon)
+# coef(intVCO2kglbmoff)
+# fixef(intVCO2kglbmoff)
+# ranef(intVCO2kglbmoff)
 ```
 
 ### Model 2C: Some interactions
 ```{r m2c VCO2kglbmoff}
-m2C <- lmer(avgVCO2kglbm ~ bout + Gender*intensity +Tanner*intensity + (bout|ID),  data = avgVCO2kglbmoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# fixef(m2C)
-# ranef(m2C)
-VCO2kglbmoff <- m2C
+VCO2kglbmoff <- lmer(avgVCO2kglbm ~ bout + Gender*intensity +Tanner*intensity + (bout|ID),  data = avgVCO2kglbmoff, REML=FALSE)
+# summary(VCO2kglbmoff)
+# coef(VCO2kglbmoff)
+# ranef(VCO2kglbmoff)
+(summ(VCO2kglbmoff)->summVCO2kglbmoff)
+(BIC(VCO2kglbmoff) -> BICVCO2kglbmoff)
+(summVCO2kglbmoff$gvars[,3] -> ICCVCO2kglbmoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
 This generates a table of individualized coefficients for each subject, which includes fixed effects + random effects. These will be used for analysis of group averages.
 
 ```{r VCO2kglbmoff coefs}
-VCO2offcoefs <- as_tibble(coef(VCO2off)$ID)
+VCO2offcoefs <- as_tibble(coef(VCO2kglbmoff)$ID)
 
 VCO2offcoefs <- tibble(demographics, VCO2offcoefs$bout)
 
 write.csv(VCO2offcoefs,"~/R/MBEB-CPET/output/VCO2offcoefs.csv", row.names = TRUE)
 ```
 
-# RQ On Transient
+## RQ On Transient
 
 First, pull out the average on and off transient RQ values for each bout.
 ```{r compute RQ avg}
@@ -831,7 +616,7 @@ avgRQoff <- aggregate(offtransbouts$RQ, by=list(bout=offtransbouts$bout, ID = of
 names(avgRQoff)[6] <- "avgRQ"
 ```
 
-##Plot the average RQ data distributions.
+### Plot the average RQ data distributions.
 ```{r plot RQ}
 #plot the avg ON-transient RQ
 ggplot(data=avgRQon, aes(bout, avgRQ, color = intensity)) + geom_point() + ggtitle("On-Transient average RQ rates")
@@ -850,7 +635,7 @@ ggplot(data=filter(avgRQon, intensity == "high"), aes(x = bout,y= avgRQ, group =
 ggplot(data=filter(avgRQoff, intensity == "high"), aes(x = bout,y= avgRQ, group = ID)) + geom_line() + ggtitle("High intensity, Avg RQ for off-transient periods") + ylim(0,2)  
 ```
 
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r xyplot RQ}
 xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -859,7 +644,7 @@ xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = Tanner, type = c("p","r"), au
 xyplot(avgRQ ~ bout | ID, data = avgRQon, groups = intensity, type = c("p","r"), auto.key = TRUE)
 ```
 
-## More visualizations
+### More visualizations
 ```{r flexplot RQ}
 ### categorical variable
 flexplot(avgRQ~Gender, data=avgRQon, spread="quartiles", jitter=c(.1, 0))
@@ -877,36 +662,37 @@ flexplot(avgRQ~bout + Gender | intensity + Tanner, data=avgRQon)
 flexplot(avgRQ~bout + Tanner | intensity + Gender, data=avgRQon)
 ```
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgRQ ~ 1 + (1|ID), data = avgRQon, REML = TRUE)
+(summ(nullmod) ->summnullRQon)
+(BIC(nullmod) -> BICnullRQon)
+(summnullRQon$gvars[,3] -> ICCnullRQon)
+```
 ### Model 1: All interactions
 
 ```{r m1 RQon}
-m1 <- lmer(avgRQ~ bout*Gender*Tanner*intensity + (bout|ID)  , data = avgRQon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# # fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r m1B RQon}
-m1B <- lmer(avgRQ~ Gender*Tanner*bout + intensity +(bout|ID)  , data = avgRQon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
+intRQon <- lmer(avgRQ~ bout*Gender*Tanner*intensity + (bout|ID)  , data = avgRQon, REML=FALSE)
+# summary(intRQon)
+(summ(intRQon)->summintRQon)
+(BIC(intRQon) -> BICintRQon)
+(summintRQon$gvars[,3] -> ICCintRQon)
+# coef(intRQon)
+# fixef(intRQon)
+# ranef(intRQon)
 ```
 
 ### Model 1C: Some interactions
 
 ```{r m1C RQon}
-m1C <- lmer(avgRQ~ Tanner*intensity + Gender + bout +(bout|ID)  , data = avgRQon, REML=FALSE)
-# summary(m1C)
-summ(m1C)
-# coef(m1C)
-# ranef(m1C)
-RQon <- m1C
+RQon <- lmer(avgRQ~ Tanner*intensity + Gender + bout +(bout|ID)  , data = avgRQon, REML=FALSE)
+# summary(RQon)
+# coef(RQon)
+# ranef(RQon)
+(summ(RQon)->summRQon)
+(BIC(RQon) -> BICRQon)
+(summRQon$gvars[,3] -> ICCRQon)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -920,37 +706,38 @@ RQoncoefs <- tibble(demographics, RQoncoefs$bout)
 write.csv(RQoncoefs,"~/R/MBEB-CPET/output/RQoncoefs.csv", row.names = TRUE)
 ```
 
-# RQ OFF TRANSIENT
+## RQ OFF TRANSIENT
+
+### Null Model
+```{r}
+nullmod <- lmer(avgRQ ~ 1 + (1|ID), data = avgRQoff, REML = TRUE)
+(summ(nullmod) ->summnullRQoff)
+(BIC(nullmod) -> BICnullRQoff)
+(summnullRQoff$gvars[,3] -> ICCnullRQoff)
+```
 
 ### Model 2: All interactions
 
 ```{r m2 RQoff}
-m2 <- lmer(avgRQ~ bout*Gender*Tanner*intensity +(bout|ID)  , data = avgRQoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-### Model 2B: Some interactions
-```{r m2b RQoff}
-m2B <- lmer(avgRQ~Gender*Tanner*bout + intensity +(bout|ID)  ,  data = avgRQoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# # fixef(m2B)
-# ranef(m2B)
+intRQoff <- lmer(avgRQ~ bout*Gender*Tanner*intensity +(bout|ID)  , data = avgRQoff, REML=FALSE)
+# summary(intRQoff)
+(summ(intRQoff)->summintRQoff)
+(BIC(intRQoff) -> BICintRQoff)
+(summintRQoff$gvars[,3] -> ICCintRQoff)
+# coef(intRQoff)
+# fixef(intRQoff)
+# ranef(intRQoff)
 ```
 
 ### Model 2C: No interactions
 ```{r m2c RQoff}
-m2C <- lmer(avgRQ~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID)  ,  data = avgRQoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# # fixef(m2C)
-# ranef(m2C)
-RQoff <- m2C
+RQoff <- lmer(avgRQ~ bout*intensity + Gender*intensity + Tanner*intensity + (bout|ID)  ,  data = avgRQoff, REML=FALSE)
+# summary(RQoff)
+# coef(RQoff)
+# ranef(RQoff)
+(summ(RQoff)->summRQoff)
+(BIC(RQoff) -> BICRQoff)
+(summRQoff$gvars[,3] -> ICCRQoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -964,100 +751,7 @@ RQoffcoefs <- tibble(demographics, RQoffcoefs$bout)
 write.csv(RQoffcoefs,"~/R/MBEB-CPET/output/RQoffcoefs.csv", row.names = TRUE)
 ```
 
-# VE/kg On Transient
-
-First, pull out the average on and off transient VE values for each bout.
-```{r compute VE avg}
-avgVEon <- aggregate(ontransbouts$'VE/kg', by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
-names(avgVEon)[6] <- "avgVE"
-
-avgVEoff <- aggregate(offtransbouts$'VE/kg', by=list(bout=offtransbouts$bout, ID = offtransbouts$ID, intensity = offtransbouts$intensity, Gender=offtransbouts$Gender, Tanner=offtransbouts$Tanner), FUN=mean)
-names(avgVEoff)[6] <- "avgVE"
-```
-
-##Plot the average VE data distributions.
-```{r plot VE}
-#plot the avg ON-transient VE
-ggplot(data=avgVEon, aes(bout, avgVE, color = intensity)) + geom_point() + ggtitle("On-Transient average VE rates")
-
-#plot the avg off-transient VE
-ggplot(data=avgVEoff, aes(bout, avgVE, color = intensity)) + geom_point()+ ggtitle("Off-Transient average VE rates")
-
-ggplot(data=filter(avgVEon, intensity == "low"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE for on-transient periods") + ylim(0,4) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVEoff, intensity == "low"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("Low intensity, Avg VE for off-transient periods")+  ylim(0,4) 
-
-ggplot(data=filter(avgVEon, intensity == "high"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE for on-transient periods")  + ylim(0,4) 
-# + geom_abline(intercept = 139, slope=7.6,color = "red", linetype="dashed", size = 1.7)
-
-ggplot(data=filter(avgVEoff, intensity == "high"), aes(x = bout,y= avgVE, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE for off-transient periods") + ylim(0,4)  
-```
-
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
-```{r xyplot VE}
-xyplot(avgVE ~ bout | ID, data = avgVEon, groups = Gender, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVE ~ bout | ID, data = avgVEon, groups = Tanner, type = c("p","r"), auto.key = TRUE)
-
-xyplot(avgVE ~ bout | ID, data = avgVEon, groups = intensity, type = c("p","r"), auto.key = TRUE)
-```
-
-## More visualizations
-```{r flexplot VE}
-### categorical variable
-flexplot(avgVE~Gender, data=avgVEon, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVE~Gender, data=avgVEoff, spread="quartiles", jitter=c(.1, 0))
-
-flexplot(avgVE~Tanner, data=avgVEon, spread="quartiles", jitter=c(.1, 0))
-flexplot(avgVE~Tanner, data=avgVEoff, spread="quartiles", jitter=c(.1, 0))
-
-### show a straight line, remove standard errors, and specify 2 bins
-flexplot(avgVE~bout + intensity | Gender + Tanner, data=avgVEon, method="lm", se=F, bins=2)
-
-### multivariate relationship
-flexplot(avgVE~bout + intensity | Gender + Tanner, data=avgVEon)
-flexplot(avgVE~bout + Gender | intensity + Tanner, data=avgVEon)
-flexplot(avgVE~bout + Tanner | intensity + Gender, data=avgVEon)
-```
-
-### Model 1: All interactions
-
-```{r m1 VEon}
-m1 <- lmer(avgVE~  bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVEon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# # fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r m1b VEon}
-m1B <- lmer(avgVE~bout + Gender*intensity + Tanner*intensity +(bout|ID)  , data = avgVEon, REML=FALSE)
-summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-VEon <- m1B
-```
-
-
-# VE OFF TRANSIENT
-
-### Model 2: All interactions
-
-```{r m2 VEoff}
-m2 <- lmer(avgVE~ bout*intensity*Gender*Tanner +(bout|ID) , data = avgVEoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-VEoff <- m2
-```
-
-# VE/kglbm On Transient
+## VE/kglbm On Transient
 
 First, pull out the average on and off transient VEkglbm values for each bout.
 ```{r}
@@ -1068,7 +762,7 @@ avgVEkglbmoff <- aggregate(offtransbouts$'VE/kglbm', by=list(bout=offtransbouts$
 names(avgVEkglbmoff)[6] <- "avgVEkglbm"
 ```
 
-##Plot the average VEkglbm data distributions.
+### Plot the average VEkglbm data distributions.
 ```{r}
 #plot the avg ON-transient VEkglbm
 ggplot(data=avgVEkglbmon, aes(bout, avgVEkglbm, color = intensity)) + geom_point() + ggtitle("On-Transient average VEkglbm rates")
@@ -1087,7 +781,7 @@ ggplot(data=filter(avgVEkglbmon, intensity == "high"), aes(x = bout,y= avgVEkglb
 ggplot(data=filter(avgVEkglbmoff, intensity == "high"), aes(x = bout,y= avgVEkglbm, group = ID)) + geom_line() + ggtitle("High intensity, Avg VEkglbm for off-transient periods") + ylim(0,5) 
 ```
 
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r}
 xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -1096,7 +790,7 @@ xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = Tanner, type = c("p
 xyplot(avgVEkglbm ~ bout | ID, data = avgVEkglbmon, groups = intensity, type = c("p","r"), auto.key = TRUE)
 ```
 
-## More visualizations
+### More visualizations
 ```{r}
 ### categorical variable
 flexplot(avgVEkglbm~Gender, data=avgVEkglbmon, spread="quartiles", jitter=c(.1, 0))
@@ -1114,33 +808,44 @@ flexplot(avgVEkglbm~bout + Gender | intensity + Tanner, data=avgVEkglbmon)
 flexplot(avgVEkglbm~bout + Tanner | intensity + Gender, data=avgVEkglbmon)
 ```
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgVEkglbm ~ 1 + (1|ID), data = avgVEkglbmon, REML = TRUE)
+(summ(nullmod) ->summnullVEkglbmon)
+(BIC(nullmod) -> BICnullVEkglbmon)
+(summnullVEkglbmon$gvars[,3] -> ICCnullVEkglbmon)
+```
 ### Model 1: All interactions
 
 ```{r}
-m1 <- lmer(avgVEkglbm~  bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVEkglbmon, REML=FALSE)
-summary(m1)
-summ(m1)
-# coef(m1)
-# # fixef(m1)
-# ranef(m1)
+intVEkglbmon <- lmer(avgVEkglbm~  bout*intensity*Gender*Tanner +(bout|ID)  , data = avgVEkglbmon, REML=FALSE)
+# summary(intVEkglbmon)
+(summ(intVEkglbmon)->summintVEkglbmon)
+(BIC(intVEkglbmon) -> BICintVEkglbmon)
+(summintVEkglbmon$gvars[,3] -> ICCintVEkglbmon)
+# coef(intVEkglbmon)
+# fixef(intVEkglbmon)
+# ranef(intVEkglbmon)
 ```
 
 ### Model 1B: Some interactions
 
 ```{r}
-m1B <- lmer(avgVEkglbm~bout + Gender + Tanner*intensity +(bout|ID)  , data = avgVEkglbmon, REML=TRUE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
-VEkglbmon <- m1B
+VEkglbmon <- lmer(avgVEkglbm~bout + Gender + Tanner*intensity +(bout|ID)  , data = avgVEkglbmon, REML=TRUE)
+# summary(VEkglbmon)
+# coef(VEkglbmon)
+# ranef(VEkglbmon)
+(summ(VEkglbmon)->summVEkglbmon)
+(BIC(VEkglbmon) -> BICVEkglbmon)
+(summVEkglbmon$gvars[,3] -> ICCVEkglbmon)
 ```
 
 ### Create a tibble of model coefficients by ID.
 This generates a table of individualized coefficients for each subject, which includes fixed effects + random effects. These will be used for analysis of group averages.
 
 ```{r}
-VEoncoefs <- as_tibble(coef(VEon)$ID)
+VEoncoefs <- as_tibble(coef(VEkglbmon)$ID)
 
 VEoncoefs <- tibble(demographics, VEoncoefs$bout)
 
@@ -1149,51 +854,49 @@ write.csv(VEoncoefs,"~/R/MBEB-CPET/output/VEoncoefs.csv", row.names = TRUE)
 
 ## VEkglbm OFF TRANSIENT
 
-### Model 2: All interactions
-
+### Null Model
 ```{r}
-m2 <- lmer(avgVEkglbm~ bout*intensity*Gender*Tanner +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
+nullmod <- lmer(avgVEkglbm ~ 1 + (1|ID), data = avgVEkglbmoff, REML = TRUE)
+(summ(nullmod) ->summnullVEkglbmoff)
+(BIC(nullmod) -> BICnullVEkglbmoff)
+(summnullVEkglbmoff$gvars[,3] -> ICCnullVEkglbmoff)
 ```
 
-
-### Model 2B: Some interactions
+### Model 2: All interactions
 ```{r}
-m2B <- lmer(avgVEkglbm~Gender*Tanner*bout+intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# # fixef(m2B)
-# ranef(m2B)
+intVEkglbmoff <- lmer(avgVEkglbm~ bout*intensity*Gender*Tanner +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+# summary(intVEkglbmoff)
+(summ(intVEkglbmoff)->summintVEkglbmoff)
+(BIC(intVEkglbmoff) -> BICintVEkglbmoff)
+(summintVEkglbmoff$gvars[,3] -> ICCintVEkglbmoff)
+# coef(intVEkglbmoff)
+# fixef(intVEkglbmoff)
+# ranef(intVEkglbmoff)
 ```
 
 ### Model 2C: Some interactions
 ```{r}
-m2C <- lmer(avgVEkglbm~Gender*intensity + bout*intensity + Tanner*intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# # fixef(m2C)
-# ranef(m2C)
-VEkglbmoff <- m2C
+VEkglbmoff <- lmer(avgVEkglbm~Gender*intensity + bout*intensity + Tanner*intensity +(bout|ID) , data = avgVEkglbmoff, REML=FALSE)
+# summary(VEkglbmoff)
+# coef(VEkglbmoff)
+# ranef(VEkglbmoff)
+(summ(VEkglbmoff)->summVEkglbmoff)
+(BIC(VEkglbmoff) -> BICVEkglbmoff)
+(summVEkglbmoff$gvars[,3] -> ICCVEkglbmoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
 This generates a table of individualized coefficients for each subject, which includes fixed effects + random effects. These will be used for analysis of group averages.
 
 ```{r}
-VEoffcoefs <- as_tibble(coef(VEoff)$ID)
+VEoffcoefs <- as_tibble(coef(VEkglbmoff)$ID)
 
 VEoffcoefs <- tibble(demographics, VEoffcoefs$bout)
 
 write.csv(VEoffcoefs,"~/R/MBEB-CPET/output/VEoffcoefs.csv", row.names = TRUE)
 ```
 
-##  RR On Transient
-
+## RR On Transient
 First, pull out the average on and off transient RR values for each bout.
 ```{r}
 avgRRon <- aggregate(ontransbouts$RR, by=list(bout=ontransbouts$bout, ID = ontransbouts$ID, intensity = ontransbouts$intensity, Gender=ontransbouts$Gender, Tanner=ontransbouts$Tanner), FUN=mean) 
@@ -1203,7 +906,7 @@ avgRRoff <- aggregate(offtransbouts$RR, by=list(bout=offtransbouts$bout, ID = of
 names(avgRRoff)[6] <- "avgRR"
 ```
 
-###Plot the average RR data distributions.
+### Plot the average RR data distributions.
 ```{r}
 #plot the avg ON-transient RR
 ggplot(data=avgRRon, aes(bout, avgRR, color = intensity)) + geom_point() + ggtitle("On-Transient average RR rates")
@@ -1222,7 +925,7 @@ ggplot(data=filter(avgRRon, intensity == "high"), aes(x = bout,y= avgRR, group =
 ggplot(data=filter(avgRRoff, intensity == "high"), aes(x = bout,y= avgRR, group = ID)) + geom_line() + ggtitle("High intensity, Avg RR for off-transient periods") + ylim(0,80)  
 ```
 
-###Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r}
 xyplot(avgRR ~ bout | ID, data = avgRRon, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -1249,36 +952,37 @@ flexplot(avgRR~bout + Gender | intensity + Tanner, data=avgRRon)
 flexplot(avgRR~bout + Tanner | intensity + Gender, data=avgRRon)
 ```
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgRR ~ 1 + (1|ID), data = avgRRon, REML = TRUE)
+(summ(nullmod) ->summnullRRon)
+(BIC(nullmod) -> BICnullRRon)
+(summnullRRon$gvars[,3] -> ICCnullRRon)
+```
 ### Model 1: All interactions
 
 ```{r}
-m1 <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgRRon, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r}
-m1B <- lmer(avgRR~Gender*Tanner*bout + intensity +(bout|ID)  , data = avgRRon, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
+intRRon <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgRRon, REML=FALSE)
+# summary(intRRon)
+(summ(intRRon)->summintRRon)
+(BIC(intRRon) -> BICintRRon)
+(summintRRon$gvars[,3] -> ICCintRRon)
+# coef(intRRon)
+# fixef(intRRon)
+# ranef(intRRon)
 ```
 
 ### Model 1C: Some interactions
 
 ```{r}
-m1C <- lmer(avgRR~ bout*intensity + Tanner + Gender  + (bout|ID)  , data = avgRRon, REML=FALSE)
-# summary(m1C)
-summ(m1C)
-# coef(m1C)
-# ranef(m1C)
-RRon <- m1C
+RRon <- lmer(avgRR~ bout*intensity + Tanner + Gender  + (bout|ID)  , data = avgRRon, REML=FALSE)
+# summary(RRon)
+# coef(RRon)
+# ranef(RRon)
+(summ(RRon)->summRRon)
+(BIC(RRon) -> BICRRon)
+(summRRon$gvars[,3] -> ICCRRon)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -1294,26 +998,36 @@ write.csv(RRoncoefs,"~/R/MBEB-CPET/output/RRoncoefs.csv", row.names = TRUE)
 
 ## RR OFF TRANSIENT
 
+### Null Model
+```{r}
+nullmod <- lmer(avgRR ~ 1 + (1|ID), data = avgRRoff, REML = TRUE)
+(summ(nullmod) ->summnullRRoff)
+(BIC(nullmod) -> BICnullRRoff)
+(summnullRRoff$gvars[,3] -> ICCnullRRoff)
+```
+
 ### Model 2: All interactions
 
 ```{r}
-m2 <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID) , data = avgRRoff, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
+intRRoff <- lmer(avgRR~Gender*Tanner*bout*intensity +(bout|ID) , data = avgRRoff, REML=FALSE)
+# summary(intRRoff)
+(summ(intRRoff)->summintRRoff)
+(BIC(intRRoff) -> BICintRRoff)
+(summintRRoff$gvars[,3] -> ICCintRRoff)
+# coef(intRRoff)
+# fixef(intRRoff)
+# ranef(intRRoff)
 ```
-
 
 ### Model 2B: Some interactions
 ```{r}
-m2B <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
-summary(m2B)
-summ(m2B)
-# coef(m2B)
-# # fixef(m2B)
-# ranef(m2B)
-RRoff <- m2B
+RRoff <- lmer(avgRR~ bout*intensity + Gender*Tanner*bout + (bout|ID) , data = avgRRoff, REML=FALSE)
+# summary(RRoff)
+# coef(RRoff)
+# ranef(RRoff)
+(summ(RRoff)->summRRoff)
+(BIC(RRoff) -> BICRRoff)
+(summRRoff$gvars[,3] -> ICCRRoff)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -1327,9 +1041,7 @@ RRoffcoefs <- tibble(demographics, RRoffcoefs$bout)
 write.csv(RRoffcoefs,"~/R/MBEB-CPET/output/RRoffcoefs.csv", row.names = TRUE)
 ```
 
-# VE/VCO2 ratio
-
-##  VE.VCO2 On Transient
+## VE.VCO2 On Transient
 
 First, pull out the average on and off transient VE.VCO2 values for each bout.
 ```{r}
@@ -1340,7 +1052,7 @@ avgVE.VCO2off <- aggregate(offtransbouts$'VE/VCO2', by=list(bout=offtransbouts$b
 names(avgVE.VCO2off)[6] <- "avgVE.VCO2"
 ```
 
-##Plot the average VE/VCO2 data distributions.
+### Plot the average VE/VCO2 data distributions.
 ```{r}
 #plot the avg ON-transient VE/VCO2
 ggplot(data=avgVE.VCO2on, aes(bout, avgVE.VCO2, color = intensity)) + geom_point() + ggtitle("On-Transient average VE/VCO2 rates")
@@ -1359,7 +1071,7 @@ ggplot(data=filter(avgVE.VCO2on, intensity == "high"), aes(x = bout,y= avgVE.VCO
 ggplot(data=filter(avgVE.VCO2off, intensity == "high"), aes(x = bout,y= avgVE.VCO2, group = ID)) + geom_line() + ggtitle("High intensity, Avg VE/VCO2 for off-transient periods") + ylim(20,80)
 ```
 
-##Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
+### Show xyplots to compare the slopes for each individual based on Gender, Tanner score, intensity
 ```{r}
 xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = Gender, type = c("p","r"), auto.key = TRUE)
 
@@ -1368,7 +1080,7 @@ xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = Tanner, type = c("p
 xyplot(avgVE.VCO2 ~ bout | ID, data = avgVE.VCO2on, groups = intensity, type = c("p","r"), auto.key = TRUE)
 ```
 
-## More visualizations
+### More visualizations
 ```{r}
 ### categorical variable
 flexplot(avgVE.VCO2~Gender, data=avgVE.VCO2on, spread="quartiles", jitter=c(.1, 0))
@@ -1386,36 +1098,36 @@ flexplot(avgVE.VCO2~bout + Gender | intensity + Tanner, data=avgVE.VCO2on)
 flexplot(avgVE.VCO2~bout + Tanner | intensity + Gender, data=avgVE.VCO2on)
 ```
 
+
+### Null Model
+```{r}
+nullmod <- lmer(avgVE.VCO2 ~ 1 + (1|ID), data = avgVE.VCO2on, REML = TRUE)
+(summ(nullmod) ->summnullVE.VCO2on)
+(BIC(nullmod) -> BICnullVE.VCO2on)
+(summnullVE.VCO2on$gvars[,3] -> ICCnullVE.VCO2on)
+```
 ### Model 1: All interactions
 
 ```{r}
-m1 <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
-# summary(m1)
-summ(m1)
-# coef(m1)
-# fixef(m1)
-# ranef(m1)
-```
-
-### Model 1B: Some interactions
-
-```{r}
-m1B <- lmer(avgVE.VCO2~Gender*Tanner*bout + intensity +(bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
-# summary(m1B)
-summ(m1B)
-# coef(m1B)
-# ranef(m1B)
+intVE.VCO2on <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+# summary(intVE.VCO2on)
+(summ(intVE.VCO2on)->summintVE.VCO2on)
+(BIC(intVE.VCO2on) -> BICintVE.VCO2on)
+(summintVE.VCO2on$gvars[,3] -> ICCintVE.VCO2on)
+# coef(intVE.VCO2on)
+# fixef(intVE.VCO2on)
+# ranef(intVE.VCO2on)
 ```
 
 ### Model 1C: Some interactions
-
 ```{r}
-m1C <- lmer(avgVE.VCO2~ bout*intensity + Tanner*intensity + Gender  + (bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
-# summary(m1C)
-summ(m1C)
-# coef(m1C)
-# ranef(m1C)
-VE.VCO2on <- m1C
+VE.VCO2on <- lmer(avgVE.VCO2~ bout*intensity + Tanner*intensity + Gender  + (bout|ID)  , data = avgVE.VCO2on, REML=FALSE)
+# summary(VE.VCO2on)
+# coef(VE.VCO2on)
+# ranef(VE.VCO2on)
+(summ(VE.VCO2on)->summVE.VCO2on)
+(BIC(VE.VCO2on) -> BICVE.VCO2on)
+(summVE.VCO2on$gvars[,3] -> ICCVE.VCO2on)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -1431,36 +1143,36 @@ write.csv(VE.VCO2oncoefs,"~/R/MBEB-CPET/output/VE.VCO2oncoefs.csv", row.names = 
 
 ## VE.VCO2 OFF TRANSIENT
 
+### Null Model
+```{r}
+nullmod <- lmer(avgVE.VCO2 ~ 1 + (1|ID), data = avgVE.VCO2off, REML = TRUE)
+(summ(nullmod) ->summnullVE.VCO2off)
+(BIC(nullmod) -> BICnullVE.VCO2off)
+(summnullVE.VCO2off$gvars[,3] -> ICCnullVE.VCO2off)
+```
+
 ### Model 2: All interactions
 
 ```{r}
-m2 <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVE.VCO2off, REML=FALSE)
-# summary(m2)
-summ(m2)
-# coef(m2)
-# ranef(m2)
-```
-
-
-### Model 2B: Some interactions
-```{r}
-m2B <- lmer(avgVE.VCO2~ bout*Gender*Tanner + intensity + (bout|ID) , data = avgVE.VCO2off, REML=FALSE)
-# summary(m2B)
-summ(m2B)
-# coef(m2B)
-# # fixef(m2B)
-# ranef(m2B)
+intVE.VCO2off <- lmer(avgVE.VCO2~Gender*Tanner*bout*intensity +(bout|ID) , data = avgVE.VCO2off, REML=FALSE)
+# summary(intVE.VCO2off)
+(summ(intVE.VCO2off)->summintVE.VCO2off)
+(BIC(intVE.VCO2off) -> BICintVE.VCO2off)
+(summintVE.VCO2off$gvars[,3] -> ICCintVE.VCO2off)
+# coef(intVE.VCO2off)
+# fixef(intVE.VCO2off)
+# ranef(intVE.VCO2off)
 ```
 
 ### Model 2C: Some interactions
 ```{r}
-m2C <- lmer(avgVE.VCO2~ bout + Gender + Tanner* intensity + (bout|ID) , data = avgVE.VCO2off, REML=TRUE)
-# summary(m2C)
-summ(m2C)
-# coef(m2C)
-# # fixef(m2C)
-# ranef(m2C)
-VE.VCO2off <- m2C
+VE.VCO2off <- lmer(avgVE.VCO2~ bout + Gender + Tanner* intensity + (bout|ID) , data = avgVE.VCO2off, REML=TRUE)
+# summary(VE.VCO2off)
+# coef(VE.VCO2off)
+# ranef(VE.VCO2off)
+(summ(VE.VCO2off)->summVE.VCO2off)
+(BIC(VE.VCO2off) -> BICVE.VCO2off)
+(summVE.VCO2off$gvars[,3] -> ICCVE.VCO2off)
 ```
 
 ### Create a tibble of model coefficients by ID.
@@ -1498,15 +1210,6 @@ dat.HRoff <- ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "i
 write.csv(dat.HRoff,"~/R/MBEB-CPET/output/dat.HRoff.csv", row.names = FALSE)
 plot(dat.HRoff, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
 
-dat.VO2KGon <- ggpredict(VO2KGon, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
-write.csv(dat.VO2KGon,"~/R/MBEB-CPET/output/dat.VO2KGon.csv", row.names = FALSE)
-dat.VO2KGon
-plot(dat.VO2KGon, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
-
-dat.VO2KGoff <- ggpredict(VO2KGoff, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
-write.csv(dat.VO2KGoff,"~/R/MBEB-CPET/output/dat.VO2KGoff.csv", row.names = FALSE)
-plot(dat.VO2KGoff, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
-
 dat.VO2KGLBMon <- ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
 write.csv(dat.VO2KGLBMon,"~/R/MBEB-CPET/output/dat.VO2KGLBMon.csv", row.names = FALSE)
 plot(dat.VO2KGLBMon, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
@@ -1514,14 +1217,6 @@ plot(dat.VO2KGLBMon, ci.style = "dot", add.data = TRUE, use.theme = T, connect.l
 dat.VO2KGLBMoff <- ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
 write.csv(dat.VO2KGLBMoff,"~/R/MBEB-CPET/output/dat.VO2KGLBMoff.csv", row.names = FALSE)
 plot(dat.VO2KGLBMoff, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
-
-dat.VCO2on <- ggpredict(VCO2on, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
-write.csv(dat.VCO2on,"~/R/MBEB-CPET/output/dat.VCO2on.csv", row.names = FALSE)
-plot(dat.VCO2on, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
-
-dat.VCO2off <- ggpredict(VCO2off, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
-write.csv(dat.VCO2off,"~/R/MBEB-CPET/output/dat.VCO2off.csv", row.names = FALSE)
-plot(dat.VCO2off, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
 
 dat.VCO2kglbmon <- ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
 write.csv(dat.VCO2kglbmon,"~/R/MBEB-CPET/output/dat.VCO2kglbmon.csv", row.names = FALSE)
@@ -1538,10 +1233,6 @@ plot(dat.RQon, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines =
 dat.RQoff <- ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
 write.csv(dat.RQoff,"~/R/MBEB-CPET/output/dat.RQoff.csv", row.names = FALSE)
 plot(dat.RQoff, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
-
-dat.VEkglbmon <- ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
-write.csv(dat.VEkglbmon,"~/R/MBEB-CPET/output/dat.VEkglbmon.csv", row.names = FALSE)
-plot(dat.VEkglbmon, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
 
 dat.VEkglbmon <- ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender", "Tanner", "intensity"))
 write.csv(dat.VEkglbmon,"~/R/MBEB-CPET/output/dat.VEkglbmon.csv", row.names = FALSE)
@@ -1568,6 +1259,851 @@ write.csv(dat.VE.VCO2off,"~/R/MBEB-CPET/output/dat.VE.VCO2off.csv", row.names = 
 plot(dat.VE.VCO2off, ci.style = "dot", add.data = TRUE, use.theme = T, connect.lines = T,residuals = TRUE, residuals.line = FALSE, dot.alpha = 0.5, dot.size = 3, jitter = NULL, collapse.group = "intensity")
 ```
 
+## Individual prediction plots
+
+To produce plots of the estimated marginal means (from the model) compared to the raw data at each combination of levels:
+
+### HRon
+```{r}
+CPET <- 'HRon'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgHRon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgHRon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgHRon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgHR'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgHRon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgHRon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgHRon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgHRon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgHRon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(HRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean HR: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### HRoff
+```{r}
+CPET <- 'HRoff'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgHRoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgHRoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgHRoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgHRoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgHRoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgHRoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgHR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgHRoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgHRoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(HRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgHR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgHR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgHR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean HR: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VO2/kg on
+```{r}
+CPET <- 'VO2kg'
+```
+
+MALES
+```{r}
+grouping <- "MEH"
+
+#raw data of MEH
+MEH <- filter(avgVO2kglbmon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MEL"
+
+#raw data of MEL
+MEL <- filter(avgVO2kglbmon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MLL"
+
+#raw data of MLL
+MLL <- filter(avgVO2kglbmon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MLH"
+
+#raw data of MLH
+MLH <- filter(avgVO2kglbmon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <- "FEH"
+
+#raw data of FEH
+FEH <- filter(avgVO2kglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FEL"
+
+#raw data of FEL
+FEL <- filter(avgVO2kglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FLL"
+
+#raw data of FLL
+FLL <- filter(avgVO2kglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FLH"
+#raw data of FLH
+FLH <- filter(avgVO2kglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VO2KGLBMon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VO2/kg off
+```{r}
+CPET <- 'VO2kg'
+```
+
+MALES
+```{r}
+grouping <- "MEH"
+
+#raw data of MEH
+MEH <- filter(avgVO2kglbmoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MEL"
+
+#raw data of MEL
+MEL <- filter(avgVO2kglbmoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MLL"
+
+#raw data of MLL
+MLL <- filter(avgVO2kglbmoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "MLH"
+
+#raw data of MLH
+MLH <- filter(avgVO2kglbmoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <- "FEH"
+
+#raw data of FEH
+FEH <- filter(avgVO2kglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FEL"
+
+#raw data of FEL
+FEL <- filter(avgVO2kglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FLL"
+
+#raw data of FLL
+FLL <- filter(avgVO2kglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <- "FLH"
+#raw data of FLH
+FLH <- filter(avgVO2kglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VO2KGLBMoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VO2/kg Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+
+
+
+
+
+
 ```{r Plot the fixed effects estimates}
 # Currently not used for this analysis.
 
@@ -1575,6 +2111,2063 @@ plot(dat.VE.VCO2off, ci.style = "dot", add.data = TRUE, use.theme = T, connect.l
 #            # inner_ci_level = .95, 
 #            plot.distributions = F)
 ```
+
+
+### VCO2/kg on
+```{r}
+CPET <- 'VCO2on'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgVCO2kglbmon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgVCO2kglbmon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgVCO2kglbmon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVCO2kglbm'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgVCO2kglbmon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgVCO2kglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgVCO2kglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgVCO2kglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgVCO2kglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VCO2kglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VCO2kglbm: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VCO2/kg off
+```{r}
+CPET <- 'VCO2off'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgVCO2kglbmoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgVCO2kglbmoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgVCO2kglbmoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgVCO2kglbmoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgVCO2kglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgVCO2kglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVCO2kglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgVCO2kglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgVCO2kglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VCO2kglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVCO2kglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVCO2kglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVCO2kglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VCO2kglbm: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### RQon
+```{r}
+CPET <- 'RQon'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgRQon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgRQon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgRQon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgRQ'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgRQon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgRQon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgRQon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgRQon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgRQon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(RQon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RQ: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### RQoff
+```{r}
+CPET <- 'RQoff'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgRQoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgRQoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgRQoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgRQoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgRQoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgRQoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRQ, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgRQoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgRQoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(RQoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgRQ'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRQ, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRQ, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RQ: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VEon
+```{r}
+CPET <- 'VEon'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgVEkglbmon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgVEkglbmon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgVEkglbmon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVEkglbm'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgVEkglbmon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgVEkglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgVEkglbmon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgVEkglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgVEkglbmon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VEkglbmon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VEkglbm: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VEoff
+```{r}
+CPET <- 'VEoff'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgVEkglbmoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgVEkglbmoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgVEkglbmoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgVEkglbmoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgVEkglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgVEkglbmoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVEkglbm, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgVEkglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgVEkglbmoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VEkglbmoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVEkglbm'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVEkglbm, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVEkglbm, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VEkglbm: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### RRon
+```{r}
+CPET <- 'RRon'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgRRon, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgRRon, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgRRon, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgRR'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgRRon, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgRRon, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgRRon, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgRRon, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgRRon, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(RRon, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean RR: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### RRoff
+```{r}
+CPET <- 'RRoff'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgRRoff, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgRRoff, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgRRoff, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgRRoff, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgRRoff, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgRRoff, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgRR, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgRRoff, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgRRoff, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(RRoff, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgRR'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgRR, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgRR, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean RR: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VE.VCO2on
+```{r}
+CPET <- 'VE.VCO2on'
+```
+
+MALES
+```{r}
+grouping <-  'MEH'
+
+#raw data of MEH
+MEH <- filter(avgVE.VCO2on, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MEL'
+
+#raw data of MEL
+MEL <- filter(avgVE.VCO2on, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLL'
+
+#raw data of MLL
+MLL <- filter(avgVE.VCO2on, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVE.VCO2'
+
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'MLH'
+
+#raw data of MLH
+MLH <- filter(avgVE.VCO2on, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+grouping <-  'FEH'
+
+#raw data of FEH
+FEH <- filter(avgVE.VCO2on, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FEL'
+
+#raw data of FEL
+FEL <- filter(avgVE.VCO2on, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLL'
+
+#raw data of FLL
+FLL <- filter(avgVE.VCO2on, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+grouping <-  'FLH'
+
+#raw data of FLH
+FLH <- filter(avgVE.VCO2on, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VE.VCO2on, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("On-Transient Mean VE.VCO2: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+### VE.VCO2off
+```{r}
+CPET <- 'VE.VCO2off'
+```
+
+MALES
+```{r}
+#raw data of MEH
+MEH <- filter(avgVE.VCO2off, Gender == "MALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEH
+dat.MEH <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.MEH)[1] <- 'bout'
+names(dat.MEH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEH) + 
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Early Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MEL
+MEL <- filter(avgVE.VCO2off, Gender == "MALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MEL
+dat.MEL <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.MEL)[1] <- 'bout'
+names(dat.MEL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MEL) + 
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = MEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Early Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLL
+MLL <- filter(avgVE.VCO2off, Gender == "MALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLL
+dat.MLL <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.MLL)[1] <- 'bout'
+names(dat.MLL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLL) + 
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Late Puberty Male, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of MLH
+MLH <- filter(avgVE.VCO2off, Gender == "MALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of MLH
+dat.MLH <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[MALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.MLH)[1] <- 'bout'
+names(dat.MLH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.MLH) + 
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = MLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Late Puberty Male, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
+FEMALES
+```{r}
+#raw data of FEH
+FEH <- filter(avgVE.VCO2off, Gender == "FEMALE", Tanner == "Early", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEH
+dat.FEH <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[high]"), type = "random"))
+names(dat.FEH)[1] <- 'bout'
+names(dat.FEH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEH) + 
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Early Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FEL
+FEL <- filter(avgVE.VCO2off, Gender == "FEMALE", Tanner == "Early", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FEL
+dat.FEL <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Early]","intensity[low]"), type = "random"))
+names(dat.FEL)[1] <- 'bout'
+names(dat.FEL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FEL) + 
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FEL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  # geom_point(data = FEH, aes(x = bout, y = avgVE.VCO2, color = 'black'), alpha = 0.5) +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Early Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLL
+FLL <- filter(avgVE.VCO2off, Gender == "FEMALE", Tanner == "Late", intensity == "low", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLL
+dat.FLL <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[low]"), type = "random"))
+names(dat.FLL)[1] <- 'bout'
+names(dat.FLL)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLL) + 
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLL, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Late Puberty FEMALE, Low intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+```{r}
+#raw data of FLH
+FLH <- filter(avgVE.VCO2off, Gender == "FEMALE", Tanner == "Late", intensity == "high", bout %in% c(1,2,3,4,5))
+
+#emmeans of FLH
+dat.FLH <- as.data.frame(ggpredict(VE.VCO2off, terms = c("bout[1,2,3,4,5]","Gender[FEMALE]","Tanner[Late]","intensity[high]"), type = "random"))
+names(dat.FLH)[1] <- 'bout'
+names(dat.FLH)[2] <- 'avgVE.VCO2'
+
+#save the plot
+jpeg(file= here("output/meanplots",paste0(CPET,grouping,"means",".jpeg"))
+       , width = 800, height = 500)
+
+ggplot(data = dat.FLH) + 
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun = mean, geom = "point")+
+  stat_summary(data = FLH, mapping = aes(x = bout, y = avgVE.VCO2, color = "black"), fun.data = mean_se, geom = "errorbar") +
+  geom_point(mapping = aes(x = bout, y = avgVE.VCO2, color = 'red'), pch = 1, size = 4) +
+  theme_bw() + 
+  ggtitle("Off-Transient Mean VE.VCO2: Late Puberty FEMALE, High intensity") +
+  scale_colour_manual(name = "data", values = c('red'='red', 'black'='black'),labels =c('Raw Data (Std Error)','Est Marginal Mean'))
+
+dev.off()
+```
+
 
 # Printing the model results as tables
 ## Tab_model version
